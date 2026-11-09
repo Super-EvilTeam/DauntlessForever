@@ -359,6 +359,18 @@ dialog form { margin-top: 18px; display: flex; justify-content: flex-end; }
 .weapon-row .item-have { min-width: 44px; text-align: right; }
 .weapon-row .weapon-inp { width: 58px; text-align: center; }
 @media (max-width: 760px) { .weapon-row { grid-template-columns: 1fr; } .weapon-ctrl { justify-content: space-between; } }
+.gauntlet-top-row { margin-bottom: 6px; }
+.gauntlet-title-wrap { display: flex; flex-direction: column; gap: 2px; }
+.gauntlet-radio-lbl { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.gauntlet-radio { accent-color: var(--brass); margin: 0; cursor: pointer; }
+.gauntlet-season-badge { font-size: 10px; padding: 2px 7px; border-radius: 999px; background: rgba(214,171,74,.18); color: var(--brass-2); border: 1px solid rgba(214,171,74,.4); text-transform: uppercase; font-weight: 600; letter-spacing: .5px; margin-left: 8px; vertical-align: middle; }
+.gauntlet-row { display: grid; grid-template-columns: minmax(130px, 1fr) auto; align-items: center; gap: 16px; padding: 10px 14px; border-top: 1px solid var(--line); }
+.gauntlet-row:first-child { border-top: 0; }
+.gauntlet-row.active { background: var(--bg-3); }
+.gauntlet-row.is-active-season { border-left: 3px solid var(--brass); }
+.gauntlet-row .item-have { min-width: 44px; text-align: right; }
+.gauntlet-row .weapon-inp { width: 58px; text-align: center; }
+@media (max-width: 760px) { .gauntlet-row { grid-template-columns: 1fr; } }
 
 /* version banner (Game Rules, Inventory): which version's save/server the page changes */
 .ver-banner { display: flex; align-items: center; gap: 16px; margin: 4px 0 18px; padding: 14px 18px; border: 1px solid #6b5520; border-left: 4px solid var(--brass); border-radius: 8px; background: linear-gradient(90deg, rgba(212,170,74,.10), rgba(212,170,74,0) 70%), var(--bg-2); }

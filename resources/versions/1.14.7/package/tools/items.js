@@ -56,6 +56,25 @@ const WEAPON_MAP = {
 const CURVE1147 = [350, 500, 700, 900, 1050, 1200, 1300, 1350, 1500, 1600, 1650, 1750, 1800, 1900, 1950, 1975, 2050, 2100, 2150];
 const levelOf = (xp, curve) => { let l = 1; xp = Number(xp) || 0; for (const c of curve) { if (xp < c) break; xp -= c; l++; } return Math.min(20, l); };
 const xpForLevel = (level, curve) => { let xp = 0; for (let i = 0; i < level - 1 && i < curve.length; i++) xp += curve[i]; return xp; };
+const GAUNTLET_SEASONS = [
+    { id: "gauntlet-season1", num: 1, name: "Season 1" },
+    { id: "gauntlet-season2", num: 2, name: "Season 2" },
+    { id: "gauntlet-season3", num: 3, name: "Season 3" },
+    { id: "gauntlet-season4", num: 4, name: "Season 4" },
+    { id: "gauntlet-season5", num: 5, name: "Season 5" }
+];
+const GAUNTLET_FILE = path.join(ROOT, "data", "gauntlet_season.txt");
+
+function activeGauntletSeason() {
+    try {
+        if (fs.existsSync(GAUNTLET_FILE)) {
+            const raw = fs.readFileSync(GAUNTLET_FILE, "utf8").trim();
+            const m = /([1-5])/.exec(raw);
+            if (m) return "gauntlet-season" + m[1];
+        }
+    } catch {}
+    return "gauntlet-season5";
+}
 
 function out(o) { process.stdout.write(JSON.stringify(o)); }
 function fail(error) { out({ ok: false, error }); process.exit(0); }
@@ -169,6 +188,21 @@ function addOne(inv, id, storage) {
                 reforge: Math.max(0, Math.floor(Number(pr.progress) || 0))
             };
         });
+        const curSeason = activeGauntletSeason();
+        const curSeasonNum = Number(/(\d+)$/.exec(curSeason)?.[1] || 5);
+        const gAll = (p && p.mega1147 && p.mega1147.gauntlet1147) || {};
+        const gProgress = {};
+        for (const s of GAUNTLET_SEASONS) {
+            const d = gAll[s.id];
+            gProgress[s.id] = d ? Math.max(0, Math.floor(Number(d.highest) || 0)) : 0;
+        }
+        const gauntlet = {
+            season: curSeason,
+            seasonNum: curSeasonNum,
+            seasons: GAUNTLET_SEASONS,
+            progress: gProgress,
+            highest: gProgress[curSeason] || 0
+        };
         const chars = characters(st).map((c) => {
             const items = {};
             for (const i of c.inv.stackedItems) if (i && i.catalogId) items[i.catalogId] = Number(i.quantity) || 0;
@@ -183,10 +217,10 @@ function addOne(inv, id, storage) {
                 for (const i of c.inv.stackedItems) if (i && Number(i.quantity) > 0 && types.get(i.catalogId) === "s" && !gear.some((g) => g.id === i.catalogId))
                     gear.push({ id: i.catalogId, instanceId: i.catalogId, level: 0, equipped: worn(c, i.catalogId) });
             }
-            return { id: c.id, name: c.name, items, gear, weapons };
+            return { id: c.id, name: c.name, items, gear, weapons, gauntlet };
         });
         out({ ok: true, characters: chars, gearCatalog: pk ? pk.items.map((g) => [g[0], g[1], g[2]]) : undefined,
-            gearTypes: pk ? pk.types : undefined, unlockAll: !!pk });
+            gearTypes: pk ? pk.types : undefined, unlockAll: !!pk, gauntlet });
         return;
     }
 
@@ -238,6 +272,30 @@ function addOne(inv, id, storage) {
                         cur.confirmed_date = new Date().toISOString().slice(0, 19);
                     }
                     result[id] = ref;
+                    continue;
+                }
+                if (id === "GAUNTLET_SEASON") {
+                    const sNum = Math.max(1, Math.min(5, Math.floor(Number(raw))));
+                    fs.mkdirSync(path.dirname(GAUNTLET_FILE), { recursive: true });
+                    fs.writeFileSync(GAUNTLET_FILE, String(sNum) + "\n", "utf8");
+                    result[id] = sNum;
+                    continue;
+                }
+                const mGLevel = /^GAUNTLET_LEVEL(?:_S([1-5]))?$/.exec(id);
+                if (mGLevel) {
+                    const newSeasonNum = changes.find(c => c[0] === "GAUNTLET_SEASON")?.[1];
+                    const targetSeason = mGLevel[1] ? ("gauntlet-season" + mGLevel[1]) : (newSeasonNum ? ("gauntlet-season" + newSeasonNum) : activeGauntletSeason());
+                    const lvl = Math.max(0, Math.min(100, Math.floor(Number(raw))));
+                    if (p) {
+                        if (!p.mega1147) p.mega1147 = {};
+                        if (!p.mega1147.gauntlet1147) p.mega1147.gauntlet1147 = {};
+                        const g = p.mega1147.gauntlet1147[targetSeason] || (p.mega1147.gauntlet1147[targetSeason] = { completed: [], highest: 0 });
+                        g.highest = lvl;
+                        const comp = [];
+                        for (let k = 1; k <= lvl; k++) comp.push(k);
+                        g.completed = comp;
+                    }
+                    result[id] = lvl;
                     continue;
                 }
                 const n = Math.max(0, Math.min(MAX, Math.floor(Number(raw))));

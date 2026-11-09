@@ -821,9 +821,10 @@ async function renderItems(reload) {
     host.appendChild(list);
   }
   renderWeapons(cur, ch, note);
+  renderGauntlet(cur, ch, note);
   renderGear(cur, ch, note);
   const other = $('item-other'); other.innerHTML = '';
-  const otherIds = [...new Set([...Object.keys(ch.items), ...Object.keys(itemPending)])].filter(id => !known.has(id) && !id.startsWith('WEAPON_LEVEL_') && !id.startsWith('WEAPON_REFORGE_')).sort();
+  const otherIds = [...new Set([...Object.keys(ch.items), ...Object.keys(itemPending)])].filter(id => !known.has(id) && !id.startsWith('WEAPON_LEVEL_') && !id.startsWith('WEAPON_REFORGE_') && !id.startsWith('GAUNTLET_')).sort();
   for (const id of otherIds) other.appendChild(row(id, id.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()), ''));
   $('item-more-n').textContent = otherIds.length;
   $('item-undo').onclick = () => { itemPending = {}; itemNote = null; itemErr = false; renderItems(false); };
@@ -916,6 +917,108 @@ function renderWeapons(cur, ch, note) {
         nextVal = Math.max(minVal, Math.min(maxVal, nextVal));
         if (isL) setLvl(nextVal); else setRef(nextVal);
       });
+    }
+    host.appendChild(r);
+  }
+}
+
+function renderGauntlet(cur, ch, note) {
+  const host = $('gauntlet-list');
+  const wrap = $('item-gauntlet');
+  if (!host || !wrap) return;
+  const g = (ch && ch.gauntlet) || (cur && cur.d && cur.d.save && cur.d.save.gauntlet);
+  wrap.hidden = !g;
+  if (wrap.hidden) return;
+  host.innerHTML = '';
+
+  const seasons = Array.isArray(g.seasons) ? g.seasons : [
+    { id: 'gauntlet-season1', num: 1, name: 'Season 1' },
+    { id: 'gauntlet-season2', num: 2, name: 'Season 2' },
+    { id: 'gauntlet-season3', num: 3, name: 'Season 3' },
+    { id: 'gauntlet-season4', num: 4, name: 'Season 4' },
+    { id: 'gauntlet-season5', num: 5, name: 'Season 5' }
+  ];
+
+  const curActiveNum = 'GAUNTLET_SEASON' in itemPending ? itemPending['GAUNTLET_SEASON'] : (g.seasonNum || 5);
+  const isSeasonDiff = curActiveNum !== (g.seasonNum || 5);
+
+  const topRow = document.createElement('div');
+  topRow.className = 'item-add-row gauntlet-top-row';
+  topRow.innerHTML = `
+    <button class="ghost" id="gauntlet-all-btn">${esc(t('Unlock all 5 seasons (100)'))}</button>
+    <span class="small">${esc(t('Select which season is active for Gauntlet mode using the radio buttons below.'))}</span>
+  `;
+  host.appendChild(topRow);
+
+  const allBtn = topRow.querySelector('#gauntlet-all-btn');
+  allBtn.onclick = () => {
+    for (const s of seasons) {
+      const key = 'GAUNTLET_LEVEL_S' + s.num;
+      const have = Math.max(0, Math.floor(Number(g.progress && g.progress[s.id]) || 0));
+      if (have === 100) delete itemPending[key]; else itemPending[key] = 100;
+    }
+    itemNote = null; itemErr = false; renderItems(false);
+  };
+
+  for (const s of seasons) {
+    const key = 'GAUNTLET_LEVEL_S' + s.num;
+    const have = Math.max(0, Math.floor(Number(g.progress && g.progress[s.id]) || 0));
+    const val = key in itemPending ? itemPending[key] : have;
+    const isLvlDiff = val !== have;
+    const isActive = s.num === curActiveNum;
+
+    const r = document.createElement('div');
+    r.className = 'season-row gauntlet-row' + (isLvlDiff || (isActive && isSeasonDiff) ? ' active' : '') + (isActive ? ' is-active-season' : '');
+    r.innerHTML = `
+      <div class="gauntlet-title-wrap">
+        <div>
+          <label class="gauntlet-radio-lbl" title="${esc(t('Click to make active season'))}">
+            <input type="radio" name="gauntlet_season_pick" class="gauntlet-radio" value="${s.num}" ${isActive ? 'checked' : ''}>
+            <span class="season-name">${esc(s.name)}</span>
+          </label>
+          ${isActive ? `<span class="gauntlet-season-badge">${isSeasonDiff ? esc(t('Active (Pending)')) : esc(t('Active Season'))}</span>` : ''}
+        </div>
+        <div class="season-kind"><code>${esc(s.id)} (levels 1-100)</code></div>
+      </div>
+      <div class="weapon-ctrl">
+        <span class="weapon-lbl">${esc(t('Level'))}</span>
+        <div class="item-have">${isLvlDiff ? `<s>${have}</s> &gt; ` : ''}<b>${val}</b></div>
+        <div class="item-edit">
+          <button class="ghost weapon-step" data-key="${key}" data-min="0" data-max="100" data-d="-1" title="${esc(t('1 level less'))}">-1</button>
+          <input class="weapon-inp gauntlet-inp" data-key="${key}" type="number" min="0" max="100" value="${val}" aria-label="${esc(s.name + ' Level')}">
+          <button class="ghost weapon-step" data-key="${key}" data-min="0" data-max="100" data-d="1" title="${esc(t('1 level more'))}">+1</button>
+          <button class="ghost weapon-step" data-key="${key}" data-min="0" data-max="100" data-d="10" title="${esc(t('10 levels more'))}">+10</button>
+          <button class="ghost weapon-step" data-key="${key}" data-min="0" data-max="100" data-set="100" title="${esc(t('Unlock All (Level 100)'))}">${esc(t('Unlock (100)'))}</button>
+          <button class="ghost weapon-step zero" data-key="${key}" data-min="0" data-max="100" data-set="0" title="${esc(t('Set to 0'))}">0</button>
+        </div>
+      </div>`;
+
+    const radio = r.querySelector('input.gauntlet-radio');
+    radio.onchange = () => {
+      if (s.num === (g.seasonNum || 5)) {
+        delete itemPending['GAUNTLET_SEASON'];
+      } else {
+        itemPending['GAUNTLET_SEASON'] = s.num;
+      }
+      itemNote = null; itemErr = false; renderItems(false);
+    };
+
+    const inp = r.querySelector('input.gauntlet-inp');
+    const setVal = (v) => {
+      v = Math.max(0, Math.min(100, Math.floor(Number(v) || 0)));
+      if (v === have) delete itemPending[key]; else itemPending[key] = v;
+      itemNote = null; itemErr = false; renderItems(false);
+    };
+    inp.onchange = () => setVal(inp.value);
+    inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); setVal(inp.value); } };
+
+    for (const b of r.querySelectorAll('button.weapon-step')) {
+      b.onclick = () => {
+        let curVal = key in itemPending ? itemPending[key] : have;
+        if (b.dataset.set !== undefined) curVal = Number(b.dataset.set);
+        else if (b.dataset.d !== undefined) curVal += Number(b.dataset.d);
+        setVal(curVal);
+      };
     }
     host.appendChild(r);
   }
