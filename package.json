@@ -9,7 +9,7 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "dev": "DL_MOCK=1 electron .",
+    "dev": "node tools/dev.js",
     "predist": "node tools/check-ascii.js && node tools/check-private.js && powershell -NoProfile -ExecutionPolicy Bypass -File tools/fetch-node.ps1",
     "predist:dir": "node tools/check-ascii.js && node tools/check-private.js && powershell -NoProfile -ExecutionPolicy Bypass -File tools/fetch-node.ps1",
     "dist": "electron-builder --win --x64",
