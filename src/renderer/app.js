@@ -820,9 +820,10 @@ async function renderItems(reload) {
     for (const it of g.items) { known.add(it.id); list.appendChild(row(it.id, it.name, it.blurb)); }
     host.appendChild(list);
   }
+  renderWeapons(cur, ch, note);
   renderGear(cur, ch, note);
   const other = $('item-other'); other.innerHTML = '';
-  const otherIds = [...new Set([...Object.keys(ch.items), ...Object.keys(itemPending)])].filter(id => !known.has(id)).sort();
+  const otherIds = [...new Set([...Object.keys(ch.items), ...Object.keys(itemPending)])].filter(id => !known.has(id) && !id.startsWith('WEAPON_LEVEL_') && !id.startsWith('WEAPON_REFORGE_')).sort();
   for (const id of otherIds) other.appendChild(row(id, id.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()), ''));
   $('item-more-n').textContent = otherIds.length;
   $('item-undo').onclick = () => { itemPending = {}; itemNote = null; itemErr = false; renderItems(false); };
@@ -842,6 +843,82 @@ async function renderItems(reload) {
     if (!known.has(id)) $('item-more').open = true;
     renderItems(false);
   };
+}
+
+function renderWeapons(cur, ch, note) {
+  const host = $('weapon-list');
+  const wrap = $('item-weapons');
+  if (!host || !wrap) return;
+  const list = Array.isArray(ch && ch.weapons) ? ch.weapons : [];
+  wrap.hidden = !list.length;
+  if (wrap.hidden) return;
+  host.innerHTML = '';
+  for (const w of list) {
+    const lvlKey = 'WEAPON_LEVEL_' + w.id.toUpperCase();
+    const refKey = 'WEAPON_REFORGE_' + w.id.toUpperCase();
+    const lvlHave = Math.max(1, Math.min(20, Math.floor(Number(w.level) || 1)));
+    const refHave = Math.max(0, Math.floor(Number(w.reforge) || 0));
+    const lvlVal = lvlKey in itemPending ? itemPending[lvlKey] : lvlHave;
+    const refVal = refKey in itemPending ? itemPending[refKey] : refHave;
+    const isLvlDiff = lvlVal !== lvlHave;
+    const isRefDiff = refVal !== refHave;
+    const r = document.createElement('div');
+    r.className = 'season-row weapon-row' + (isLvlDiff || isRefDiff ? ' active' : '');
+    r.innerHTML = `
+      <div>
+        <div class="season-name">${esc(t(w.name))}</div>
+        <div class="season-kind"><code>ExperienceTrack_Weapon_${esc(w.id)}</code></div>
+      </div>
+      <div class="weapon-ctrl">
+        <span class="weapon-lbl">${esc(t('Level'))}</span>
+        <div class="item-have">${isLvlDiff ? `<s>${lvlHave}</s> &gt; ` : ''}<b>${lvlVal}</b></div>
+        <div class="item-edit">
+          <button class="ghost weapon-step" data-key="${lvlKey}" data-min="1" data-max="20" data-d="-1" title="${esc(t('1 level less'))}">-1</button>
+          <input class="weapon-inp" type="number" min="1" max="20" value="${lvlVal}" aria-label="${esc(t(w.name))} ${esc(t('Level'))}">
+          <button class="ghost weapon-step" data-key="${lvlKey}" data-min="1" data-max="20" data-d="1" title="${esc(t('1 level more'))}">+1</button>
+          <button class="ghost weapon-step" data-key="${lvlKey}" data-min="1" data-max="20" data-set="20" title="${esc(t('Max level (20)'))}">20</button>
+        </div>
+      </div>
+      <div class="weapon-ctrl">
+        <span class="weapon-lbl">${esc(t('Reforge'))}</span>
+        <div class="item-have">${isRefDiff ? `<s>${refHave}</s> &gt; ` : ''}<b>${refVal}</b></div>
+        <div class="item-edit">
+          <button class="ghost weapon-step" data-key="${refKey}" data-min="0" data-max="9999" data-d="-1" title="${esc(t('1 reforge less'))}">-1</button>
+          <input class="weapon-inp" type="number" min="0" max="9999" value="${refVal}" aria-label="${esc(t(w.name))} ${esc(t('Reforge'))}">
+          <button class="ghost weapon-step" data-key="${refKey}" data-min="0" data-max="9999" data-d="1" title="${esc(t('1 reforge more'))}">+1</button>
+          <button class="ghost weapon-step" data-key="${refKey}" data-min="0" data-max="9999" data-d="5" title="${esc(t('5 reforges more'))}">+5</button>
+          <button class="ghost weapon-step zero" data-key="${refKey}" data-min="0" data-max="9999" data-set="0" title="${esc(t('Set to 0'))}">0</button>
+        </div>
+      </div>`;
+    const inps = r.querySelectorAll('input.weapon-inp');
+    const lvlInp = inps[0], refInp = inps[1];
+    const setLvl = (v) => {
+      v = Math.max(1, Math.min(20, Math.floor(Number(v) || 1)));
+      if (v === lvlHave) delete itemPending[lvlKey]; else itemPending[lvlKey] = v;
+      itemNote = null; itemErr = false; renderItems(false);
+    };
+    const setRef = (v) => {
+      v = Math.max(0, Math.min(9999, Math.floor(Number(v) || 0)));
+      if (v === refHave) delete itemPending[refKey]; else itemPending[refKey] = v;
+      itemNote = null; itemErr = false; renderItems(false);
+    };
+    lvlInp.addEventListener('change', () => setLvl(lvlInp.value));
+    lvlInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') setLvl(lvlInp.value); });
+    refInp.addEventListener('change', () => setRef(refInp.value));
+    refInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') setRef(refInp.value); });
+    for (const b of r.querySelectorAll('.weapon-step')) {
+      b.addEventListener('click', () => {
+        const key = b.dataset.key;
+        const isL = key === lvlKey;
+        const curVal = isL ? lvlVal : refVal;
+        const minVal = Number(b.dataset.min), maxVal = Number(b.dataset.max);
+        let nextVal = b.dataset.set !== undefined ? Number(b.dataset.set) : curVal + Number(b.dataset.d || 0);
+        nextVal = Math.max(minVal, Math.min(maxVal, nextVal));
+        if (isL) setLvl(nextVal); else setRef(nextVal);
+      });
+    }
+    host.appendChild(r);
+  }
 }
 
 // Gear part of the Inventory page (versions whose helper returns gear + a gear catalog: 1.6.2, and 1.14.7 since DF-INV-1147,

@@ -35,6 +35,27 @@ const MAX = 99999999;
 const KEEP_BACKUPS = 10;
 const DEFAULT_EPIC = "d211000000000000000000000000e91c";   // the offline sign-in's built-in id (as slayer-copy.js)
 const STARTER = new Set(["WP_EB_TRAINING", "LT_BASIC"]);  // the backend hands these back anyway (no spawn without them)
+const WEAPONS = [
+    { id: "Axe", name: "Axe" },
+    { id: "ChainBlades", name: "Chain Blades" },
+    { id: "Hammer", name: "Hammer" },
+    { id: "Repeaters", name: "Repeaters" },
+    { id: "Spear", name: "War Pike" },
+    { id: "Strikers", name: "Aether Strikers" },
+    { id: "Sword", name: "Sword" }
+];
+const WEAPON_MAP = {
+    AXE: "Axe",
+    CHAINBLADES: "ChainBlades",
+    HAMMER: "Hammer",
+    REPEATERS: "Repeaters",
+    SPEAR: "Spear",
+    STRIKERS: "Strikers",
+    SWORD: "Sword"
+};
+const CURVE1147 = [350, 500, 700, 900, 1050, 1200, 1300, 1350, 1500, 1600, 1650, 1750, 1800, 1900, 1950, 1975, 2050, 2100, 2150];
+const levelOf = (xp, curve) => { let l = 1; xp = Number(xp) || 0; for (const c of curve) { if (xp < c) break; xp -= c; l++; } return Math.min(20, l); };
+const xpForLevel = (level, curve) => { let xp = 0; for (let i = 0; i < level - 1 && i < curve.length; i++) xp += curve[i]; return xp; };
 
 function out(o) { process.stdout.write(JSON.stringify(o)); }
 function fail(error) { out({ ok: false, error }); process.exit(0); }
@@ -71,10 +92,13 @@ function myKey() {
     try { const m = /^\s*EpicAccountId\s*=\s*([0-9a-f]{32})\s*$/im.exec(fs.readFileSync(path.join(ROOT, "eos", "eos_offline.ini"), "utf8")); if (m) epic = m[1]; } catch {}
     return crypto.createHash("sha256").update("epic:" + epic).digest("hex").slice(0, 32);
 }
+function myPlayer(state) {
+    const players = state.players || {};
+    return players[myKey()] || players[state.lastPlayer];
+}
 // Your characters with their inventories (the recorder keys inventories by character id)
 function characters(state) {
-    const players = state.players || {};
-    const p = players[myKey()] || players[state.lastPlayer];
+    const p = myPlayer(state);
     if (!p) return [];
     const list = [];
     for (const ch of p.characters || []) {
@@ -132,7 +156,20 @@ function addOne(inv, id, storage) {
     if (cmd === "list") {
         const pk = picker();
         const types = pk ? new Map(pk.items.map((g) => [g[0], g[3]])) : null;
-        const chars = characters(readState()).map((c) => {
+        const st = readState();
+        const p = myPlayer(st);
+        const tr = (p && p.progress && p.progress.tracks) || {};
+        const weapons = WEAPONS.map((w) => {
+            const exp = tr["ExperienceTrack_Weapon_" + w.id] || {};
+            const pr = tr["PrestigeTrack_Weapon_" + w.id] || {};
+            return {
+                id: w.id,
+                name: w.name,
+                level: levelOf(exp.progress, CURVE1147),
+                reforge: Math.max(0, Math.floor(Number(pr.progress) || 0))
+            };
+        });
+        const chars = characters(st).map((c) => {
             const items = {};
             for (const i of c.inv.stackedItems) if (i && i.catalogId) items[i.catalogId] = Number(i.quantity) || 0;
             let gear;
@@ -146,7 +183,7 @@ function addOne(inv, id, storage) {
                 for (const i of c.inv.stackedItems) if (i && Number(i.quantity) > 0 && types.get(i.catalogId) === "s" && !gear.some((g) => g.id === i.catalogId))
                     gear.push({ id: i.catalogId, instanceId: i.catalogId, level: 0, equipped: worn(c, i.catalogId) });
             }
-            return { id: c.id, name: c.name, items, gear };
+            return { id: c.id, name: c.name, items, gear, weapons };
         });
         out({ ok: true, characters: chars, gearCatalog: pk ? pk.items.map((g) => [g[0], g[1], g[2]]) : undefined,
             gearTypes: pk ? pk.types : undefined, unlockAll: !!pk });
@@ -164,8 +201,45 @@ function addOne(inv, id, storage) {
         if (!targets.length) fail("Character not found.");
         backup();
         const result = {};
+        const p = myPlayer(state);
         for (const c of targets) {
             for (const [id, raw] of changes) {
+                const mLvl = /^WEAPON_LEVEL_([A-Z]+)$/.exec(id);
+                const mRef = /^WEAPON_REFORGE_([A-Z]+)$/.exec(id);
+                if (mLvl && WEAPON_MAP[mLvl[1]]) {
+                    const w = WEAPON_MAP[mLvl[1]];
+                    const lvl = Math.max(1, Math.min(20, Math.floor(Number(raw))));
+                    if (p) {
+                        if (!p.progress) p.progress = { tracks: {}, objectives: {} };
+                        if (!p.progress.tracks) p.progress.tracks = {};
+                        const trackId = "ExperienceTrack_Weapon_" + w;
+                        const cur = p.progress.tracks[trackId] || (p.progress.tracks[trackId] = { progress: 0 });
+                        const curLvl = levelOf(cur.progress, CURVE1147);
+                        if (lvl !== curLvl) {
+                            cur.progress = xpForLevel(lvl, CURVE1147);
+                            cur.confirmed_fremium_rank = lvl;
+                            cur.confirmed_premium_rank = lvl;
+                            cur.confirmed_date = new Date().toISOString().slice(0, 19);
+                            if (lvl < 20) cur.bankedXp = 0;
+                        }
+                    }
+                    result[id] = lvl;
+                    continue;
+                }
+                if (mRef && WEAPON_MAP[mRef[1]]) {
+                    const w = WEAPON_MAP[mRef[1]];
+                    const ref = Math.max(0, Math.min(9999, Math.floor(Number(raw))));
+                    if (p) {
+                        if (!p.progress) p.progress = { tracks: {}, objectives: {} };
+                        if (!p.progress.tracks) p.progress.tracks = {};
+                        const prId = "PrestigeTrack_Weapon_" + w;
+                        const cur = p.progress.tracks[prId] || (p.progress.tracks[prId] = { progress: 0 });
+                        cur.progress = ref;
+                        cur.confirmed_date = new Date().toISOString().slice(0, 19);
+                    }
+                    result[id] = ref;
+                    continue;
+                }
                 const n = Math.max(0, Math.min(MAX, Math.floor(Number(raw))));
                 const st = c.inv.stackedItems;
                 const i = st.findIndex((x) => x && x.catalogId === id);

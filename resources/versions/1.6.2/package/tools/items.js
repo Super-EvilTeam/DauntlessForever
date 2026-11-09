@@ -36,6 +36,47 @@ const SQLITE = path.join(ROOT, "backend", "metagame", "node_modules", "better-sq
 const ID_OK = /^[A-Z0-9_]{3,80}$/;
 const MAX = 99999999;
 const KEEP_BACKUPS = 10;
+const WEAPONS = [
+    { id: "Axe", name: "Axe" },
+    { id: "ChainBlades", name: "Chain Blades" },
+    { id: "Hammer", name: "Hammer" },
+    { id: "Repeaters", name: "Repeaters" },
+    { id: "Spear", name: "War Pike" },
+    { id: "Strikers", name: "Aether Strikers" },
+    { id: "Sword", name: "Sword" }
+];
+const WEAPON_MAP = {
+    AXE: "Axe",
+    CHAINBLADES: "ChainBlades",
+    HAMMER: "Hammer",
+    REPEATERS: "Repeaters",
+    SPEAR: "Spear",
+    STRIKERS: "Strikers",
+    SWORD: "Sword"
+};
+const CURVE162 = [300, 400, 600, 1000, 1400, 1800, 2300, 2800, 3300, 3800, 4200, 4600, 4900, 5100, 5300, 5500, 5600, 5700, 5800];
+const levelOf = (xp, curve) => { let l = 1; xp = Number(xp) || 0; for (const c of curve) { if (xp < c) break; xp -= c; l++; } return Math.min(20, l); };
+const xpForLevel = (level, curve) => { let xp = 0; for (let i = 0; i < level - 1 && i < curve.length; i++) xp += curve[i]; return xp; };
+
+function bonusFile162(userId) {
+    return path.join(ROOT, "data", "progression", String(userId).replace(/[^\w-]/g, "_") + ".bonus.json");
+}
+function readBonus162(userId) {
+    const f = bonusFile162(userId);
+    try {
+        const b = JSON.parse(fs.readFileSync(f, "utf8").replace(/^﻿/, ""));
+        b.xp = b.xp || {};
+        b.prestige = b.prestige || {};
+        return b;
+    } catch {
+        return { xp: {}, prestige: {}, reforgedXp: {} };
+    }
+}
+function writeBonus162(userId, b) {
+    const f = bonusFile162(userId);
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, JSON.stringify(b, null, 2), "utf8");
+}
 const GEAR_FILE = path.join(__dirname, "gear-162.json");   // [[id, name, type], ...] from the 1.6.2 catalog
 function gearCatalog() { try { return JSON.parse(fs.readFileSync(GEAR_FILE, "utf8")); } catch { return null; } }
 const COSMETIC_FILE = path.join(__dirname, "cosmetics-162.json");   // {stacked: [ids], instanced: [ids]}
@@ -136,6 +177,18 @@ function backup() {
             const names = Object.fromEntries(db.prepare("select characterId, name from characters").all().map((r) => [r.characterId, r.name]));
             const mine = myCharacterIds(db);
             if (!mine) fail("Could not tell which account is yours (data\\player.key). Run Set up again.");
+            const me = myAccount(db);
+            const bonus = me ? readBonus162(me) : { xp: {}, prestige: {} };
+            const weapons = WEAPONS.map((w) => {
+                const xp = Number((bonus.xp || {})["ExperienceTrack_Weapon_" + w.id]) || 0;
+                const pr = Number((bonus.prestige || {})["PrestigeTrack_Weapon_" + w.id]) || 0;
+                return {
+                    id: w.id,
+                    name: w.name,
+                    level: levelOf(xp, CURVE162),
+                    reforge: Math.max(0, Math.floor(pr))
+                };
+            });
             const cat = gearCatalog();
             const gearIds = cat ? new Set(cat.map((g) => g[0])) : null;
             const loadoutText = Object.fromEntries(db.prepare("select characterId, loadouts, persistent from loadouts").all().map((r) => [r.characterId, String(r.loadouts || "") + String(r.persistent || "")]));
@@ -150,7 +203,7 @@ function backup() {
                 for (const i of JSON.parse(r.instancedItems || "[]")) if (i && instancedUnlocks.has(i.catalogId)) items[i.catalogId] = 1;
                 // cosmetics kept as an unlock show in the gear list too, so they can be seen and removed there
                 if (gear) for (const i of JSON.parse(r.stackedItems || "[]")) if (i && i.quantity > 0 && gearIds.has(i.catalogId) && stackedUnlocks.has(i.catalogId) && !gear.some((g) => g.id === i.catalogId)) gear.push({ id: i.catalogId, instanceId: i.catalogId, level: 0, equipped: lt.includes('"' + i.catalogId + '"') });
-                return { id: r.characterId, name: names[r.characterId] || "", items, gear };
+                return { id: r.characterId, name: names[r.characterId] || "", items, gear, weapons };
             });
             out({ ok: true, characters, gearCatalog: cat || undefined, unlockAll: !!(cat && COS.stacked.length) });
         } finally { db.close(); }
@@ -169,15 +222,40 @@ function backup() {
         try {
             const mine = myCharacterIds(db);
             if (!mine) fail("Could not tell which account is yours (data\\player.key). Run Set up again.");
+            const me = myAccount(db);
+            let bonus = null, bonusChanged = false;
+            if (me) {
+                bonus = readBonus162(me);
+                for (const [id, raw] of changes) {
+                    const mLvl = /^WEAPON_LEVEL_([A-Z]+)$/.exec(id);
+                    const mRef = /^WEAPON_REFORGE_([A-Z]+)$/.exec(id);
+                    if (mLvl && WEAPON_MAP[mLvl[1]]) {
+                        const w = WEAPON_MAP[mLvl[1]];
+                        const lvl = Math.max(1, Math.min(20, Math.floor(Number(raw))));
+                        bonus.xp["ExperienceTrack_Weapon_" + w] = xpForLevel(lvl, CURVE162);
+                        result[id] = lvl;
+                        bonusChanged = true;
+                    }
+                    if (mRef && WEAPON_MAP[mRef[1]]) {
+                        const w = WEAPON_MAP[mRef[1]];
+                        const ref = Math.max(0, Math.min(9999, Math.floor(Number(raw))));
+                        bonus.prestige["PrestigeTrack_Weapon_" + w] = ref;
+                        result[id] = ref;
+                        bonusChanged = true;
+                    }
+                }
+                if (bonusChanged) writeBonus162(me, bonus);
+            }
             const rows = db.prepare("select characterId, stackedItems, instancedItems from inventories").all()
                 .filter((r) => mine.has(r.characterId) && (who === "*" || r.characterId === who));
-            if (!rows.length) fail("Character not found.");
+            if (!rows.length && !bonusChanged) fail("Character not found.");
             const upd = db.prepare("update inventories set stackedItems=?, instancedItems=? where characterId=?");
             db.transaction(() => {
                 for (const r of rows) {
                     let s = JSON.parse(r.stackedItems || "[]"), inst = JSON.parse(r.instancedItems || "[]");
                     const loadout = loadoutOf(db, r.characterId);
                     for (const [id, raw] of changes) {
+                        if (id.startsWith("WEAPON_LEVEL_") || id.startsWith("WEAPON_REFORGE_")) continue;
                         const cos = stackedUnlocks.has(id) || instancedUnlocks.has(id);
                         const n = cos ? (Number(raw) > 0 ? 1 : 0) : Math.max(0, Math.min(MAX, Math.floor(Number(raw))));
                         if (cos && n === 0 && mentioned(loadout, id)) throw Error("Unequip the cosmetic before removing it: " + id);

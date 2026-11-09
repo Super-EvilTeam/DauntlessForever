@@ -351,6 +351,14 @@ dialog form { margin-top: 18px; display: flex; justify-content: flex-end; }
 .item-add { margin-top: 22px; }
 .item-add-row { display: flex; gap: 8px; align-items: center; }
 .item-add-row #item-add-id { width: 280px; text-transform: uppercase; }
+.weapon-row { display: grid; grid-template-columns: minmax(130px, 1fr) auto auto; align-items: center; gap: 16px; padding: 10px 14px; border-top: 1px solid var(--line); }
+.weapon-row:first-child { border-top: 0; }
+.weapon-row.active { background: var(--bg-3); }
+.weapon-ctrl { display: flex; align-items: center; gap: 8px; }
+.weapon-lbl { color: var(--ink-3); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.weapon-row .item-have { min-width: 44px; text-align: right; }
+.weapon-row .weapon-inp { width: 58px; text-align: center; }
+@media (max-width: 760px) { .weapon-row { grid-template-columns: 1fr; } .weapon-ctrl { justify-content: space-between; } }
 
 /* version banner (Game Rules, Inventory): which version's save/server the page changes */
 .ver-banner { display: flex; align-items: center; gap: 16px; margin: 4px 0 18px; padding: 14px 18px; border: 1px solid #6b5520; border-left: 4px solid var(--brass); border-radius: 8px; background: linear-gradient(90deg, rgba(212,170,74,.10), rgba(212,170,74,0) 70%), var(--bg-2); }
