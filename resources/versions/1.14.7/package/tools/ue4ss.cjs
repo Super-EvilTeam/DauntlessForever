@@ -85,6 +85,23 @@ function setListEntry(p, name, value) {
 }
 const BOSSBAR = 'Boss Health Bar';   // built into this package's loader, not a UE4SS mod
 const TRIALS = 'Trials Quick Retry';   // DF-WARM-1147: a spare trial server, in tools\server-1147.ps1; no UE4SS needed
+const GAUNTLET3 = 'GauntletThreeBehemoths';
+const GAUNTLET_PAK = 'zzzzzzzzzzzzzzzz_GauntletThreeBehemoths_P.pak';
+function syncGauntletPak(isOn) {
+  const g = gameDir(); if (!g) return;
+  const paksDir = path.join(g, 'Archon', 'Content', 'Paks');
+  const pak = path.join(paksDir, GAUNTLET_PAK);
+  const pakOff = pak + '.off';
+  const srcPak = path.join(ROOT, 'bin', GAUNTLET_PAK);
+  try {
+    if (isOn) {
+      if (fs.existsSync(pakOff)) fs.renameSync(pakOff, pak);
+      else if (!fs.existsSync(pak) && fs.existsSync(srcPak)) fs.copyFileSync(srcPak, pak);
+    } else {
+      if (fs.existsSync(pak)) fs.renameSync(pak, pakOff);
+    }
+  } catch {}
+}
 function mods(p) {
   const m = mode();
   const boss = { name: BOSSBAR, on: m.bossbar, builtin: false, scripts: true, df: true,
@@ -101,8 +118,11 @@ function ue4ssMods(p) {
     .map((d) => {
       // UE4SS also switches a mod on with an enabled.txt in its folder
       const flag = fs.existsSync(path.join(p.mods, d.name, 'enabled.txt'));
+      const isG3 = d.name === GAUNTLET3;
       return { name: d.name, on: on.has(d.name) ? on.get(d.name) || flag : flag, builtin: BUILTIN.has(d.name),
-        scripts: fs.existsSync(path.join(p.mods, d.name, 'Scripts')) || fs.existsSync(path.join(p.mods, d.name, 'dlls')) };
+        scripts: fs.existsSync(path.join(p.mods, d.name, 'Scripts')) || fs.existsSync(path.join(p.mods, d.name, 'dlls')),
+        about: isG3 ? 'Spawns 3 Behemoths in the arena instead of 2 in Gauntlet Mode.' : undefined,
+        keys: isG3 ? [['F6', 'log active behemoths in UE4SS.log']] : undefined };
     })
     .sort((a, b) => (a.builtin - b.builtin) || a.name.localeCompare(b.name));
 }
@@ -222,6 +242,7 @@ async function install() {
     setListEntry(p, a, b === 'on');
     const flag = path.join(p.mods, a, 'enabled.txt');   // enabled.txt would keep it on regardless of mods.txt
     if (b === 'off' && fs.existsSync(flag)) fs.renameSync(flag, flag + '.off');
+    if (a === GAUNTLET3) syncGauntletPak(b === 'on');
     return out({ ok: true, mods: mods(p) });
   }
   if (cmd === 'prepare') {
@@ -231,6 +252,9 @@ async function install() {
     if (!fs.existsSync(p.dll)) return out({ ok: false, on: true, bossbar: m.bossbar, ue4ss: false, error: 'UE4SS is not installed (launcher: Mods > Get UE4SS).' });
     hideConsoles(p);
     bundledMods(p);
+    const { on: modsOn } = readList(p);
+    const gOn = modsOn.has(GAUNTLET3) ? modsOn.get(GAUNTLET3) : fs.existsSync(path.join(p.mods, GAUNTLET3, 'enabled.txt'));
+    syncGauntletPak(gOn);
     return out({ ok: true, on: true, servers: m.servers, bossbar: m.bossbar, ue4ss: true, movedProxy: moved });
   }
   fail('Use status | install | set | mod | prepare');
