@@ -7,6 +7,7 @@
         { "id": "CURRENCY_NOTES", "name": "Rams", "blurb": "The everyday currency: crafting, upgrades, the Slayer's Path." },
         { "id": "CURRENCY_PJM_WEAPON", "name": "Combat Merits", "blurb": "Slayer's Path nodes (sword icon)." },
         { "id": "CURRENCY_PJM_AIRSHIP", "name": "Airship Merits", "blurb": "Slayer's Path nodes (the other Merit counter)." },
+        { "id": "CURRENCY_ESCALATION_HEROIC", "name": "Heroic Merits", "blurb": "Slayer's Path milestone nodes (Heroic Escalation)." },
         { "id": "CURRENCY_PJM_PRESTIGE_FILLED", "name": "Aetherhearts", "blurb": "Reforging and power surging." },
         { "id": "CURRENCY_PJM_PRESTIGE_EMPTY", "name": "Aethersparks", "blurb": "Weapon mastery reward, turns into Aetherhearts." },
         { "id": "CURRENCY_PRESTIGE", "name": "Vault Coins", "blurb": "Vault currency." },
