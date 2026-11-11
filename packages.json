@@ -10,11 +10,11 @@
                      },
                      {
                          "id":  "1.14.7",
-                         "packageVersion":  "2026-11-07",
-                         "url":  "https://github.com/addison2k/DauntlessForever/releases/download/packages/1.14.7-2026-11-07.zip",
-                         "sha256":  "5bd96585cc5646060cd0c2893f61a9b1afd494b1f45149cca8ade008067f2410",
-                         "date":  "2026-11-07",
-                         "note":  "Rubberband fix: no more hard pull-backs in hunts. Falling forever fixed: a player who falls off the map is put back where they last stood. Game log on by default for reports. Middleman: re-rolling a +3 cell costs 20 Aetherdust instead of 2,000 Rams and shows the Aetherdust icon (BitSents). The game no longer offers items you have none of."
+                         "packageVersion":  "2026-11-10.3",
+                         "url":  "https://github.com/addison2k/DauntlessForever/releases/download/packages/1.14.7-2026-11-10.3.zip",
+                         "sha256":  "4da3ab955b14dd3e8c5b006791db3d19382b4ae13e5f862109f2a372adeb085a",
+                         "date":  "2026-11-10",
+                         "note":  "Hosting: your own game connects straight to your servers, no more relay lag for the host (thanks Exiseze). Two old helper scripts that antivirus flagged are gone; the loader already does their job."
                      }
                  ],
     "launcher":  {
