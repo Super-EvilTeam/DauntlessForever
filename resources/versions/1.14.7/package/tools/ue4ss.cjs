@@ -34,7 +34,16 @@ const fail = (error) => { out({ ok: false, error }); process.exit(0); };
 const sha = (f) => { try { return crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex'); } catch { return null; } };
 
 function gameDir() {
-  try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'config.json'), 'utf8').replace(/^\uFEFF/, '')).GameDir || null; } catch { return null; }
+  try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'config.json'), 'utf8').replace(/^\uFEFF/, '')).GameDir || null; } catch {
+    try {
+      const local = process.env.LOCALAPPDATA;
+      if (local) {
+        const c = JSON.parse(fs.readFileSync(path.join(local, 'DauntlessForever', 'versions', '1.14.7', 'config.json'), 'utf8'));
+        if (c && c.GameDir) return c.GameDir;
+      }
+    } catch {}
+    return null;
+  }
 }
 function places() {
   const g = gameDir(); if (!g) fail('The game folder is not known yet. Run Set up first.');
@@ -87,6 +96,157 @@ const BOSSBAR = 'Boss Health Bar';   // built into this package's loader, not a 
 const TRIALS = 'Trials Quick Retry';   // DF-WARM-1147: a spare trial server, in tools\server-1147.ps1; no UE4SS needed
 const GAUNTLET3 = 'GauntletThreeBehemoths';
 const GAUNTLET_PAK = 'zzzzzzzzzzzzzzzz_GauntletThreeBehemoths_P.pak';
+const GAUNTLET_CFG_FILE = path.join(DATA, 'gauntlet.json');
+const GAUNTLET_MODIFIERS = [
+  { id: 'HM_PUSHANDPULL', name: 'Push and Pull', desc: 'Gravitational shockwaves pulse across the arena floor', seasons: [3] },
+  { id: 'HM_FAST_ATTACKS', name: 'Fast Attacks', desc: 'Accelerated Behemoth attack and recovery speed', seasons: [2] },
+  { id: 'HM_ELECTRIFY', name: 'Electrify', desc: 'Lightning orbs and shock auras periodically pulse', seasons: [1, 2, 3, 4, 5] },
+  { id: 'HM_COMBUSTION', name: 'Combustion', desc: 'Fiery explosions erupt under Slayers or on impacts', seasons: [1, 2, 3] },
+  { id: 'HM_ENVIRONMENT_DEEPFREEZE', name: 'Deep Freeze', desc: 'Severe Frostbite cold slows stamina recovery', seasons: [2] },
+  { id: 'HM_FURY', name: 'Fury', desc: 'Behemoths enrage faster, stay enraged longer, hit harder', seasons: [2] },
+  { id: 'HM_AFTERSHOCK', name: 'Aftershock', desc: 'Fissures erupt from the ground after slams', seasons: [2] },
+  { id: 'HM_STONEHIDE', name: 'Stonehide', desc: 'Heavily reduced damage until armor plates break', seasons: [1, 2] },
+  { id: 'HM_THICK_SKULL', name: 'Thick Skull', desc: 'Massive stagger and interrupt resistance', seasons: [2] },
+  { id: 'HM_POISON_BLOOD', name: 'Poison Blood', desc: 'Corruption and poison hazard damage', seasons: [2] },
+  { id: 'HM_LESS_NORMAL_MORE_EXPOSE', name: 'Weak Spot Surge', desc: 'Only wounded or broken parts take high damage', seasons: [1, 2] },
+  { id: 'HM_MOMENTUM', name: 'Momentum', desc: 'Behemoths gain increased movement and charge speed', seasons: [1] },
+  { id: 'HM_FRIGID_TOUCH', name: 'Frigid Touch', desc: 'Frost hazards build up on hits', seasons: [1, 2, 3] },
+  { id: 'HM_ENTROPY', name: 'Entropy', desc: 'Aetheric anomalies drain Slayer stamina or health', seasons: [1, 2, 3] },
+  { id: 'HM_ANEMIC', name: 'Anemic', desc: 'Healing effectiveness and potion power significantly reduced', seasons: [3] }
+];
+
+function getActiveSeasonNum() {
+  try {
+    const seasonFile = path.join(DATA, 'gauntlet_season.txt');
+    if (fs.existsSync(seasonFile)) {
+      const raw = fs.readFileSync(seasonFile, 'utf8').trim();
+      const m = /([1-5])/.exec(raw);
+      if (m) return Number(m[1]);
+    }
+  } catch {}
+  return 5;
+}
+
+function unlockGauntletLevels(targetSeason) {
+  try {
+    const stateFile = path.join(DATA, 'state.json');
+    if (!fs.existsSync(stateFile)) return false;
+    const raw = fs.readFileSync(stateFile, 'utf8');
+    const state = JSON.parse(raw.replace(/^\uFEFF/, ''));
+    const players = state.players || {};
+    let p = null;
+    let epic = 'd211000000000000000000000000e91c';
+    try {
+      const m = /^\s*EpicAccountId\s*=\s*([0-9a-f]{32})\s*$/im.exec(fs.readFileSync(path.join(ROOT, 'eos', 'eos_offline.ini'), 'utf8'));
+      if (m) epic = m[1];
+    } catch {}
+    const myKey = crypto.createHash('sha256').update('epic:' + epic).digest('hex').slice(0, 32);
+    p = players[myKey] || players[state.lastPlayer];
+    if (!p) {
+      const keys = Object.keys(players);
+      if (keys.length) p = players[keys[0]];
+    }
+    if (!p) return false;
+    if (!p.mega1147) p.mega1147 = {};
+    if (!p.mega1147.gauntlet1147) p.mega1147.gauntlet1147 = {};
+
+    const targets = [];
+    if (!targetSeason || targetSeason === 'all' || targetSeason === 0) {
+      targets.push(1, 2, 3, 4, 5);
+    } else {
+      targets.push(Number(targetSeason));
+    }
+
+    const comp = [];
+    for (let k = 1; k <= 100; k++) comp.push(k);
+
+    for (const n of targets) {
+      p.mega1147.gauntlet1147['gauntlet-season' + n] = { completed: comp.slice(), highest: 100 };
+    }
+
+    const tmp = stateFile + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(state, null, 2), 'utf8');
+    JSON.parse(fs.readFileSync(tmp, 'utf8'));
+    fs.renameSync(tmp, stateFile);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function gauntletGet() {
+  const def = {
+    season: 3,
+    allDualBehemothLevels: true,
+    targetLevels: [5],
+    behemothCount: 3,
+    timeLimitSeconds: 0,
+    modifiers: ['HM_PUSHANDPULL', 'HM_ELECTRIFY'],
+    replaceExistingModifiers: true,
+    unlockAllLevels: true
+  };
+  let cfg = def;
+  try {
+    if (fs.existsSync(GAUNTLET_CFG_FILE)) {
+      cfg = Object.assign({}, def, JSON.parse(fs.readFileSync(GAUNTLET_CFG_FILE, 'utf8')));
+    }
+  } catch {}
+  const activeSeason = getActiveSeasonNum();
+  return { ok: true, config: cfg, activeSeason, seasons: [1, 2, 3, 4, 5], availableModifiers: GAUNTLET_MODIFIERS };
+}
+
+function gauntletLevelGet(season, level) {
+  const patcher = path.join(ROOT, 'tools', 'gauntlet_patcher.py');
+  try {
+    const s = String(season || '3'), l = String(level || '1');
+    const outStr = execFileSync('python', [patcher, 'inspect', s, l], { encoding: 'utf8', windowsHide: true });
+    return JSON.parse(outStr.trim());
+  } catch (e) {
+    return { ok: false, error: 'Could not inspect level: ' + (e.message || String(e)) };
+  }
+}
+
+function gauntletSet(raw) {
+  let cfg;
+  try {
+    let s = String(raw || '').trim();
+    if (s.startsWith('b64:')) s = Buffer.from(s.slice(4), 'base64').toString('utf8');
+    cfg = JSON.parse(s);
+  } catch (e) {
+    try {
+      const s = String(raw).replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
+      cfg = JSON.parse(s);
+    } catch {
+      fail('Invalid JSON configuration.');
+    }
+  }
+  fs.mkdirSync(DATA, { recursive: true });
+  fs.writeFileSync(GAUNTLET_CFG_FILE, JSON.stringify(cfg, null, 2) + '\r\n');
+  const sNum = Number(cfg.season);
+  if (Number.isInteger(sNum) && sNum >= 1 && sNum <= 5) {
+    try {
+      const seasonFile = path.join(DATA, 'gauntlet_season.txt');
+      fs.writeFileSync(seasonFile, String(sNum) + '\n', 'utf8');
+    } catch {}
+  }
+  if (cfg.unlockAllLevels) {
+    unlockGauntletLevels(cfg.season);
+  }
+  const patcher = path.join(ROOT, 'tools', 'gauntlet_patcher.py');
+  try {
+    execFileSync('python', [patcher, JSON.stringify(cfg)], { windowsHide: true });
+  } catch (e) {
+    fail('Could not generate custom pak: ' + (e.message || String(e)));
+  }
+  try {
+    const p = places();
+    const { on: modsOn } = readList(p);
+    const gOn = modsOn.has(GAUNTLET3) ? modsOn.get(GAUNTLET3) : fs.existsSync(path.join(p.mods, GAUNTLET3, 'enabled.txt'));
+    syncGauntletPak(gOn);
+  } catch {}
+  return { ok: true, message: 'Custom Gauntlet applied!', activeSeason: getActiveSeasonNum() };
+}
+
 function syncGauntletPak(isOn) {
   const g = gameDir(); if (!g) return;
   const paksDir = path.join(g, 'Archon', 'Content', 'Paks');
@@ -96,7 +256,13 @@ function syncGauntletPak(isOn) {
   try {
     if (isOn) {
       if (fs.existsSync(pakOff)) fs.renameSync(pakOff, pak);
-      else if (!fs.existsSync(pak) && fs.existsSync(srcPak)) fs.copyFileSync(srcPak, pak);
+      if (!fs.existsSync(srcPak)) {
+        const patcher = path.join(ROOT, 'tools', 'gauntlet_patcher.py');
+        if (fs.existsSync(patcher)) {
+          try { execFileSync('python', [patcher], { windowsHide: true }); } catch {}
+        }
+      }
+      if (fs.existsSync(srcPak)) fs.copyFileSync(srcPak, pak);
     } else {
       if (fs.existsSync(pak)) fs.renameSync(pak, pakOff);
     }
@@ -119,9 +285,9 @@ function ue4ssMods(p) {
       // UE4SS also switches a mod on with an enabled.txt in its folder
       const flag = fs.existsSync(path.join(p.mods, d.name, 'enabled.txt'));
       const isG3 = d.name === GAUNTLET3;
-      return { name: d.name, on: on.has(d.name) ? on.get(d.name) || flag : flag, builtin: BUILTIN.has(d.name),
+      return { name: d.name, title: isG3 ? 'Gauntlet Customizer' : d.name, on: on.has(d.name) ? on.get(d.name) || flag : flag, builtin: BUILTIN.has(d.name),
         scripts: fs.existsSync(path.join(p.mods, d.name, 'Scripts')) || fs.existsSync(path.join(p.mods, d.name, 'dlls')),
-        about: isG3 ? 'Spawns 3 Behemoths in the arena instead of 2 in Gauntlet Mode.' : undefined,
+        about: isG3 ? 'Customize Gauntlet Mode: spawn 1-4 Behemoths, select Seasons 1-5, adjust match timers, configure individual level rounds, and stack hunt modifiers.' : undefined,
         keys: isG3 ? [['F6', 'log active behemoths in UE4SS.log']] : undefined };
     })
     .sort((a, b) => (a.builtin - b.builtin) || a.name.localeCompare(b.name));
@@ -215,6 +381,10 @@ async function install() {
     const p = places(), m = mode();
     return out({ ok: true, installed: fs.existsSync(p.dll), on: m.on, servers: m.servers, folder: p.mods, mods: mods(p) });
   }
+  if (cmd === 'gauntlet-get') return out(gauntletGet());
+  if (cmd === 'gauntlet-level-get') return out(gauntletLevelGet(a, b));
+  if (cmd === 'gauntlet-set') return out(gauntletSet(process.argv.slice(3).join(' ')));
+  if (cmd === 'gauntlet-unlock-all') return out({ ok: unlockGauntletLevels('all'), message: 'All 5 seasons unlocked to Level 100!' });
   if (cmd === 'install') return out(await install());
   if (cmd === 'set') {
     const m = mode();
