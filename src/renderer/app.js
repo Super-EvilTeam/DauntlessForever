@@ -737,8 +737,421 @@ async function renderMods() {
       if (!!m.on !== val) b.onclick = () => act('mod', m.name, val ? 'on' : 'off', val ? t('{name} on: applies the next time you press Play.', { name: m.title || m.name }) : t('{name} off: applies the next time you press Play.', { name: m.title || m.name }));
       host.appendChild(b);
     }
+    if (m.name === 'GauntletThreeBehemoths') {
+      const cfgBtn = document.createElement('button');
+      cfgBtn.className = 'season-filter rule-choice gauntlet-cfg-btn';
+      cfgBtn.textContent = 'Configure';
+      cfgBtn.onclick = () => openGauntletConfig();
+      host.appendChild(cfgBtn);
+    }
     list.appendChild(row);
   }
+}
+
+let gauntletData = null;
+async function openGauntletConfig() {
+  const dlg = $('dlg-gauntlet');
+  if (!dlg) return;
+  const status = $('gcfg-status');
+  status.textContent = 'Loading configuration...';
+  status.className = 'action-note';
+  dlg.showModal();
+
+  let res = null;
+  try {
+    res = await L.modsAct(modsVer, 'gauntlet-get');
+  } catch (e) {
+    status.textContent = 'Could not load configuration.';
+    status.className = 'action-note err';
+    return;
+  }
+  if (!res || !res.ok) {
+    status.textContent = (res && res.error) || 'Failed to load configuration.';
+    status.className = 'action-note err';
+    return;
+  }
+  status.textContent = '';
+  gauntletData = res;
+  const cfg = res.config || {};
+  const activeSeasonNum = Number(res.activeSeason || 5);
+
+  // Populate Season dropdown dynamically with (Active / Current) marker
+  const seasonSelect = $('gcfg-season');
+  seasonSelect.innerHTML = '';
+  for (let s = 1; s <= 5; s++) {
+    const opt = document.createElement('option');
+    opt.value = String(s);
+    opt.textContent = 'Season ' + s + (s === activeSeasonNum ? ' (Active / Current)' : '');
+    seasonSelect.appendChild(opt);
+  }
+  const allOpt = document.createElement('option');
+  allOpt.value = 'all';
+  allOpt.textContent = 'All Seasons';
+  seasonSelect.appendChild(allOpt);
+
+  const initialSeason = cfg.season !== undefined ? String(cfg.season) : String(activeSeasonNum);
+  seasonSelect.value = initialSeason;
+
+  // Scope and View Switching
+  const allDual = cfg.allDualBehemothLevels !== false;
+  $('gcfg-levels-scope').value = allDual ? 'all' : 'specific';
+  $('gcfg-spec-level-wrap').hidden = allDual;
+  $('gcfg-global-options').hidden = !allDual;
+  $('gcfg-specific-level-editor').hidden = allDual;
+
+  $('gcfg-level-num').value = (Array.isArray(cfg.targetLevels) && cfg.targetLevels[0]) || 5;
+
+  let currentLevelData = null;
+  let activeRoundIdx = 0;
+  const levelCache = (cfg && cfg.levelConfig) ? JSON.parse(JSON.stringify(cfg.levelConfig)) : {};
+
+  async function loadSpecificLevel() {
+    const sVal = $('gcfg-season').value;
+    const sNum = sVal === 'all' ? 3 : Number(sVal);
+    const maxLvl = (sNum >= 4) ? 16 : 20;
+    let lvlNum = Number($('gcfg-level-num').value || 1);
+    if (isNaN(lvlNum) || lvlNum < 1) lvlNum = 1;
+    if (lvlNum > maxLvl) lvlNum = maxLvl;
+    $('gcfg-level-num').value = lvlNum;
+    $('gcfg-level-num').max = String(maxLvl);
+    const cacheKey = String(lvlNum);
+
+    status.textContent = 'Inspecting Season ' + sNum + ' Level ' + lvlNum + ' struct...';
+    status.className = 'action-note';
+
+    let inspRes = null;
+    try {
+      inspRes = await L.modsAct(modsVer, 'gauntlet-level-get', sNum, lvlNum);
+    } catch (e) {
+      inspRes = { ok: false, error: String(e && e.message || e) };
+    }
+
+    if (!inspRes || !inspRes.ok) {
+      status.textContent = (inspRes && inspRes.error) || 'Failed to inspect level struct.';
+      status.className = 'action-note err';
+      return;
+    }
+    status.textContent = '';
+    status.className = 'action-note';
+
+    currentLevelData = inspRes;
+    if (levelCache[cacheKey]) {
+      const saved = levelCache[cacheKey];
+      if (saved.timeLimit) currentLevelData.timeLimit = saved.timeLimit;
+      if (Array.isArray(saved.rounds)) {
+        saved.rounds.forEach((sr, idx) => {
+          if (currentLevelData.rounds[idx]) {
+            if (sr.arena) currentLevelData.rounds[idx].arena = sr.arena;
+            if (sr.behemoths) currentLevelData.rounds[idx].behemoths = sr.behemoths.slice();
+            if (sr.modifiers) currentLevelData.rounds[idx].modifiers = sr.modifiers.slice();
+          }
+        });
+      }
+    }
+
+    const tVal = String(Math.round(currentLevelData.timeLimit || 420));
+    const timerSel = $('gcfg-spec-timer');
+    let hasOpt = false;
+    for (let i = 0; i < timerSel.options.length; i++) {
+      if (timerSel.options[i].value === tVal) { timerSel.selectedIndex = i; hasOpt = true; break; }
+    }
+    if (!hasOpt) {
+      const opt = document.createElement('option');
+      opt.value = tVal;
+      const m = Math.floor(Number(tVal) / 60), s = Number(tVal) % 60;
+      opt.textContent = 'Custom (' + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s + ')';
+      timerSel.appendChild(opt);
+      timerSel.value = tVal;
+    }
+    timerSel.onchange = () => {
+      if (currentLevelData) currentLevelData.timeLimit = Number(timerSel.value);
+    };
+
+    renderRoundTabs();
+    renderActiveRound();
+  }
+
+  function renderRoundTabs() {
+    const tabs = $('gcfg-round-tabs').querySelectorAll('.rule-choice');
+    tabs.forEach((tab, idx) => {
+      const isAct = idx === activeRoundIdx;
+      tab.classList.toggle('active', isAct);
+      tab.setAttribute('aria-pressed', String(isAct));
+      tab.onclick = () => {
+        activeRoundIdx = idx;
+        renderRoundTabs();
+        renderActiveRound();
+      };
+    });
+  }
+
+  function renderActiveRound() {
+    if (!currentLevelData || !currentLevelData.rounds || !currentLevelData.rounds[activeRoundIdx]) return;
+    const rnd = currentLevelData.rounds[activeRoundIdx];
+    const cat = currentLevelData.catalog || {};
+    const behList = cat.behemoths || [];
+
+    const arenaSel = $('gcfg-round-arena');
+    arenaSel.value = rnd.arena || 'EGauntletArena::Plaza';
+    arenaSel.onchange = () => {
+      rnd.arena = arenaSel.value;
+    };
+
+    const pills = $('gcfg-round-count-pills').querySelectorAll('button');
+    const curCount = Math.max(1, Math.min(4, (rnd.behemoths && rnd.behemoths.length) || 1));
+    pills.forEach(p => {
+      const c = Number(p.getAttribute('data-count'));
+      const isAct = c === curCount;
+      p.classList.toggle('active', isAct);
+      p.setAttribute('aria-pressed', String(isAct));
+      p.onclick = () => {
+        if (!rnd.behemoths) rnd.behemoths = [];
+        while (rnd.behemoths.length < c) {
+          rnd.behemoths.push(rnd.behemoths[rnd.behemoths.length - 1] || (behList[0] && behList[0].id) || 'beaver_normal');
+        }
+        if (rnd.behemoths.length > c) {
+          rnd.behemoths = rnd.behemoths.slice(0, c);
+        }
+        renderActiveRound();
+      };
+    });
+
+    const slotsCont = $('gcfg-round-slots-container');
+    slotsCont.innerHTML = '';
+    for (let slot = 0; slot < curCount; slot++) {
+      const row = document.createElement('div');
+      row.className = 'gcfg-slot-row';
+      const lbl = document.createElement('label');
+      lbl.className = 'gcfg-slot-label';
+      lbl.textContent = 'Slot ' + (slot + 1);
+
+      const sel = document.createElement('select');
+      sel.className = 'fr-input';
+      for (const b of behList) {
+        const opt = document.createElement('option');
+        opt.value = b.id;
+        opt.textContent = b.name;
+        sel.appendChild(opt);
+      }
+      sel.value = rnd.behemoths[slot] || (behList[0] && behList[0].id) || 'beaver_normal';
+      const curSlot = slot;
+      sel.onchange = () => {
+        rnd.behemoths[curSlot] = sel.value;
+      };
+
+      row.appendChild(lbl);
+      row.appendChild(sel);
+      slotsCont.appendChild(row);
+    }
+
+    const roundModList = $('gcfg-round-mods-list');
+    roundModList.innerHTML = '';
+    const rndModsSet = new Set(rnd.modifiers || []);
+    const sNum = Number($('gcfg-season').value) || 3;
+    const availMods = (res.availableModifiers || []).filter(m => !m.seasons || m.seasons.includes(sNum));
+    for (const m of availMods) {
+      const item = document.createElement('label');
+      item.className = 'gauntlet-mod-item';
+      const isChecked = rndModsSet.has(m.id);
+      item.innerHTML = `<input type="checkbox" value="${esc(m.id)}"${isChecked ? ' checked' : ''}>
+        <div class="gauntlet-mod-info">
+          <span class="gauntlet-mod-name">${esc(m.name)}</span>
+          <span class="gauntlet-mod-desc">${esc(m.desc)}</span>
+        </div>`;
+      item.querySelector('input').onchange = (e) => {
+        if (!rnd.modifiers) rnd.modifiers = [];
+        if (e.target.checked) {
+          if (!rnd.modifiers.includes(m.id)) rnd.modifiers.push(m.id);
+        } else {
+          rnd.modifiers = rnd.modifiers.filter(x => x !== m.id);
+        }
+      };
+      roundModList.appendChild(item);
+    }
+  }
+
+  $('gcfg-levels-scope').onchange = () => {
+    const isAll = $('gcfg-levels-scope').value === 'all';
+    $('gcfg-spec-level-wrap').hidden = isAll;
+    $('gcfg-global-options').hidden = !isAll;
+    $('gcfg-specific-level-editor').hidden = isAll;
+    if (!isAll) loadSpecificLevel();
+  };
+
+  $('gcfg-level-num').onchange = () => {
+    if ($('gcfg-levels-scope').value === 'specific') {
+      loadSpecificLevel();
+    }
+  };
+
+  // Unlock all levels checkbox & quick action
+  $('gcfg-unlock-all').checked = cfg.unlockAllLevels !== false;
+  $('gcfg-unlock-all-seasons-btn').onclick = async () => {
+    status.textContent = 'Unlocking all 5 Gauntlet seasons...';
+    status.className = 'action-note';
+    let uRes = null;
+    try {
+      uRes = await L.modsAct(modsVer, 'gauntlet-unlock-all');
+    } catch (e) {
+      uRes = { ok: false, error: String(e && e.message || e) };
+    }
+    if (uRes && uRes.ok) {
+      itemData = null;
+      status.textContent = 'All 5 Gauntlet seasons unlocked to Level 100!';
+      status.className = 'action-note';
+    } else {
+      status.textContent = (uRes && uRes.error) || 'Failed to unlock all seasons.';
+      status.className = 'action-note err';
+    }
+  };
+
+  // Behemoth count pills
+  const countPills = $('gcfg-count-pills').querySelectorAll('button');
+  const curCount = Number(cfg.behemothCount || 3);
+  countPills.forEach(b => {
+    const c = Number(b.getAttribute('data-count'));
+    const isAct = c === curCount;
+    b.classList.toggle('active', isAct);
+    b.setAttribute('aria-pressed', String(isAct));
+    b.onclick = () => {
+      countPills.forEach(p => { p.classList.remove('active'); p.setAttribute('aria-pressed', 'false'); });
+      b.classList.add('active');
+      b.setAttribute('aria-pressed', 'true');
+    };
+  });
+
+  // Timer override
+  $('gcfg-timer-override').value = String(cfg.timeLimitSeconds || 0);
+
+  // Modifiers grid
+  const modList = $('gcfg-modifiers-list');
+  const selectedMods = new Set(cfg.modifiers || []);
+  const renderModifiers = (seasonVal) => {
+    modList.innerHTML = '';
+    const sNum = seasonVal === 'all' ? 0 : Number(seasonVal);
+    const mods = (res.availableModifiers || []).filter(m => {
+      if (!m.seasons || sNum === 0) return true;
+      return m.seasons.includes(sNum);
+    });
+
+    for (const m of mods) {
+      const item = document.createElement('label');
+      item.className = 'gauntlet-mod-item';
+      const isChecked = selectedMods.has(m.id);
+      item.innerHTML = `<input type="checkbox" value="${esc(m.id)}"${isChecked ? ' checked' : ''}>
+        <div class="gauntlet-mod-info">
+          <span class="gauntlet-mod-name">${esc(m.name)}</span>
+          <span class="gauntlet-mod-desc">${esc(m.desc)}</span>
+        </div>`;
+      item.querySelector('input').onchange = (e) => {
+        if (e.target.checked) selectedMods.add(m.id);
+        else selectedMods.delete(m.id);
+      };
+      modList.appendChild(item);
+    }
+  };
+  renderModifiers($('gcfg-season').value);
+  $('gcfg-season').onchange = () => {
+    renderModifiers($('gcfg-season').value);
+    if ($('gcfg-levels-scope').value === 'specific') {
+      loadSpecificLevel();
+    }
+  };
+
+  if (!allDual) {
+    loadSpecificLevel();
+  }
+
+  // Cancel / Close
+  $('gcfg-cancel').textContent = 'Cancel';
+  $('gcfg-cancel').onclick = () => {
+    dlg.close();
+    renderMods();
+  };
+
+  // Save
+  $('gcfg-save').onclick = async () => {
+    const isAll = $('gcfg-levels-scope').value === 'all';
+    const lvlNum = Math.max(1, Math.min(20, Number($('gcfg-level-num').value || 1)));
+    const unlockAll = $('gcfg-unlock-all').checked;
+    const seasonVal = $('gcfg-season').value;
+    const seasonNum = seasonVal === 'all' ? 'all' : Number(seasonVal);
+
+    let newCfg;
+    if (isAll) {
+      const actBtn = $('gcfg-count-pills').querySelector('.active');
+      const chosenCount = actBtn ? Number(actBtn.getAttribute('data-count')) : 3;
+      const pickedMods = [];
+      modList.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => pickedMods.push(cb.value));
+
+      newCfg = {
+        season: seasonNum,
+        allDualBehemothLevels: true,
+        targetLevels: [lvlNum],
+        behemothCount: chosenCount,
+        timeLimitSeconds: Number($('gcfg-timer-override').value || 0),
+        modifiers: pickedMods,
+        replaceExistingModifiers: true,
+        unlockAllLevels: unlockAll
+      };
+    } else {
+      const cacheKey = String(lvlNum);
+      const lvlDataToSave = {
+        timeLimit: Number($('gcfg-spec-timer').value || (currentLevelData && currentLevelData.timeLimit) || 420),
+        rounds: (currentLevelData && currentLevelData.rounds) ? currentLevelData.rounds.map(r => ({
+          round: r.round,
+          arena: r.arena,
+          behemoths: (r.behemoths || []).slice(),
+          modifiers: (r.modifiers || []).slice()
+        })) : []
+      };
+      levelCache[cacheKey] = lvlDataToSave;
+
+      newCfg = {
+        season: seasonNum,
+        allDualBehemothLevels: false,
+        targetLevels: [lvlNum],
+        levelConfig: levelCache,
+        unlockAllLevels: unlockAll
+      };
+    }
+
+    status.textContent = 'Compiling custom Gauntlet patch...';
+    status.className = 'action-note';
+    $('gcfg-save').disabled = true;
+
+    let sRes = null;
+    try {
+      sRes = await L.modsAct(modsVer, 'gauntlet-set', newCfg);
+    } catch (e) {
+      sRes = { ok: false, error: String(e && e.message || e) };
+    }
+    $('gcfg-save').disabled = false;
+
+    if (!sRes || !sRes.ok) {
+      status.textContent = (sRes && sRes.error) || 'Failed to save configuration.';
+      status.className = 'action-note err';
+      return;
+    }
+
+    itemData = null;
+    delete itemPending['GAUNTLET_SEASON'];
+
+    const newActive = Number(sRes.activeSeason || (Number.isInteger(seasonNum) ? seasonNum : activeSeasonNum));
+    for (let s = 1; s <= 5; s++) {
+      const opt = seasonSelect.querySelector('option[value="' + s + '"]');
+      if (opt) opt.textContent = 'Season ' + s + (s === newActive ? ' (Active / Current)' : '');
+    }
+
+    if (Number.isInteger(seasonNum)) {
+      status.textContent = 'Configuration saved! Season ' + seasonNum + (isAll ? '' : ' Level ' + lvlNum) + ' customized and active' + (unlockAll ? ' (levels 1-100 unlocked).' : '.');
+    } else {
+      status.textContent = 'Configuration saved! Custom patch compiled' + (unlockAll ? ' (levels 1-100 unlocked).' : '.');
+    }
+    status.className = 'action-note';
+    $('gcfg-cancel').textContent = 'Close';
+    renderMods();
+  };
 }
 
 // ---------------------------------------------------------------- Inventory (add / remove items in the save)

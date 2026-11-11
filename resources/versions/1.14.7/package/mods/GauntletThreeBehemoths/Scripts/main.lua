@@ -1,6 +1,6 @@
 -- ============================================================================
--- Gauntlet Three Behemoths Mod for Dauntless 1.14.7 (UE4SS v3.0.1)
--- Spawns 3 Behemoths in the arena instead of 2 in Gauntlet Mode.
+-- Gauntlet Customizer Mod for Dauntless 1.14.7 (UE4SS v3.0.1)
+-- Customizes Gauntlet Mode: 1-4 Behemoths, season switching, level & round configs.
 -- Encounter definitions are injected natively via:
 -- zzzzzzzzzzzzzzzz_GauntletThreeBehemoths_P.pak
 -- ============================================================================

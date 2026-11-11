@@ -13,7 +13,7 @@ const settings = require('./settings');
 // Never overwritten by a package copy/update: things set-up or the player made. Matched by name at any depth
 // (node_modules) or by path from the package root. The version's saveFiles are added per version.
 const PRESERVE_NAMES = new Set(['node_modules', '.env']);
-const PRESERVE_PATHS = ['config.json', 'home', 'logs', 'upload', 'backup', 'captures', 'eos/eos_offline.ini', 'eos/eos_offline.log', 'data/gameserver.key', 'data/player.key'];
+const PRESERVE_PATHS = ['config.json', 'home', 'logs', 'upload', 'backup', 'captures', 'eos/eos_offline.ini', 'eos/eos_offline.log', 'data/gameserver.key', 'data/player.key', 'data/gauntlet.json', 'data/gauntlet_season.txt', 'bin/zzzzzzzzzzzzzzzz_GauntletThreeBehemoths_P.pak'];
 
 // ---------------------------------------------------------------- registry
 function loadRegistry() {

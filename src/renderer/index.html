@@ -763,6 +763,141 @@
   </div>
 </dialog>
 
+<dialog id="dlg-gauntlet" class="wide gauntlet-dlg">
+  <h2 id="gcfg-title">Gauntlet Level Customizer</h2>
+  <p class="small" id="gcfg-subtitle">Configure which Season, Levels, Behemoths, and Modifiers spawn in Gauntlet Mode.</p>
+  
+  <div class="gauntlet-field-grid">
+    <div class="gauntlet-field">
+      <label class="report-label" for="gcfg-season">Season</label>
+      <select id="gcfg-season" class="fr-input">
+        <option value="1">Season 1</option>
+        <option value="2">Season 2</option>
+        <option value="3">Season 3</option>
+        <option value="4">Season 4</option>
+        <option value="5">Season 5</option>
+        <option value="all">All Seasons</option>
+      </select>
+    </div>
+
+    <div class="gauntlet-field">
+      <label class="report-label" for="gcfg-levels-scope">Levels to Mod</label>
+      <select id="gcfg-levels-scope" class="fr-input">
+        <option value="all">All Dual-Behemoth Levels</option>
+        <option value="specific">Specific Level (e.g. Level 5)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="fr-line" id="gcfg-spec-level-wrap" hidden style="margin-top: 8px;">
+    <label class="report-label" for="gcfg-level-num">Level Number</label>
+    <input id="gcfg-level-num" class="fr-input" type="number" min="1" max="30" value="5" style="max-width: 120px;">
+  </div>
+
+  <div class="gauntlet-unlock-row" style="margin-top: 12px; display: flex; align-items: center; justify-content: space-between; background: rgba(255, 255, 255, 0.04); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.08);">
+    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+      <input type="checkbox" id="gcfg-unlock-all" checked>
+      <span style="font-weight: 500;">Unlock All Levels (1-100)</span>
+      <span class="small" style="color: var(--muted);">(access any level on the hunt board)</span>
+    </label>
+    <button type="button" class="ghost" id="gcfg-unlock-all-seasons-btn" style="font-size: 11px; padding: 3px 10px;">Unlock All 5 Seasons</button>
+  </div>
+
+  <div id="gcfg-global-options">
+    <div class="gauntlet-section" style="margin-top: 14px;">
+      <label class="report-label">Behemoths per Dual-Round</label>
+      <div class="rule-choices" id="gcfg-count-pills">
+        <button type="button" class="season-filter rule-choice" data-count="1">1 Solo</button>
+        <button type="button" class="season-filter rule-choice" data-count="2">2 Dual</button>
+        <button type="button" class="season-filter rule-choice active" data-count="3" aria-pressed="true">3 Trio (Mod)</button>
+        <button type="button" class="season-filter rule-choice" data-count="4">4 Brawl</button>
+      </div>
+    </div>
+
+    <div class="gauntlet-section" style="margin-top: 14px;">
+      <label class="report-label" for="gcfg-timer-override">Starting Match Timer</label>
+      <select id="gcfg-timer-override" class="fr-input">
+        <option value="0">Default (07:00)</option>
+        <option value="180">Speedrun (03:00)</option>
+        <option value="300">Fast (05:00)</option>
+        <option value="600">Endurance (10:00)</option>
+        <option value="900">Marathon (15:00)</option>
+      </select>
+    </div>
+
+    <div class="gauntlet-section" style="margin-top: 16px;">
+      <label class="report-label">Round Modifiers (Hunt Modifiers)</label>
+      <p class="small" style="margin: 2px 0 8px;">Select which modifiers apply to the round. Multiple modifiers stack together.</p>
+      <div class="gauntlet-mods-grid" id="gcfg-modifiers-list">
+        <!-- Injected dynamically in app.js -->
+      </div>
+    </div>
+  </div>
+
+  <div id="gcfg-specific-level-editor" hidden style="margin-top: 14px;">
+    <div class="gauntlet-field">
+      <label class="report-label" for="gcfg-spec-timer">Starting Match Timer</label>
+      <select id="gcfg-spec-timer" class="fr-input">
+        <option value="420">Default (07:00)</option>
+        <option value="180">Speedrun (03:00)</option>
+        <option value="300">Fast (05:00)</option>
+        <option value="600">Endurance (10:00)</option>
+        <option value="900">Marathon (15:00)</option>
+      </select>
+    </div>
+
+    <div class="gauntlet-section" style="margin-top: 12px;">
+      <label class="report-label">Level Rounds (5 Rounds)</label>
+      <div class="gcfg-round-tabs" id="gcfg-round-tabs">
+        <button type="button" class="season-filter rule-choice active" data-round="1" aria-pressed="true">Round 1</button>
+        <button type="button" class="season-filter rule-choice" data-round="2" aria-pressed="false">Round 2</button>
+        <button type="button" class="season-filter rule-choice" data-round="3" aria-pressed="false">Round 3</button>
+        <button type="button" class="season-filter rule-choice" data-round="4" aria-pressed="false">Round 4</button>
+        <button type="button" class="season-filter rule-choice" data-round="5" aria-pressed="false">Round 5</button>
+      </div>
+
+      <div class="gcfg-round-box" id="gcfg-round-card">
+        <div class="gauntlet-field">
+          <label class="report-label" for="gcfg-round-arena">Round Arena</label>
+          <select id="gcfg-round-arena" class="fr-input">
+            <option value="EGauntletArena::Plaza">Plaza (Central Ruins)</option>
+            <option value="EGauntletArena::Forge">Forge (Molten Core)</option>
+            <option value="EGauntletArena::Hangar">Hangar (Aetheric Platforms)</option>
+          </select>
+        </div>
+
+        <div class="gauntlet-section" style="margin-top: 12px;">
+          <label class="report-label">Behemoth Count in this Round</label>
+          <div class="rule-choices" id="gcfg-round-count-pills">
+            <button type="button" class="season-filter rule-choice" data-count="1">1 Solo</button>
+            <button type="button" class="season-filter rule-choice" data-count="2">2 Dual</button>
+            <button type="button" class="season-filter rule-choice" data-count="3">3 Trio</button>
+            <button type="button" class="season-filter rule-choice" data-count="4">4 Brawl</button>
+          </div>
+
+          <div id="gcfg-round-slots-container" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+            <!-- Injected dynamically in app.js -->
+          </div>
+        </div>
+
+        <div class="gauntlet-section" style="margin-top: 14px;">
+          <label class="report-label">Round Modifiers</label>
+          <p class="small" style="margin: 2px 0 8px;">Select modifiers that apply to this round.</p>
+          <div class="gauntlet-mods-grid" id="gcfg-round-mods-list">
+            <!-- Injected dynamically in app.js -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="action-note" id="gcfg-status" aria-live="polite" style="margin-top: 12px;"></p>
+  <div class="dlg-actions">
+    <button type="button" class="ghost" id="gcfg-cancel">Cancel</button>
+    <button type="button" class="primary small-btn" id="gcfg-save">Save & Apply</button>
+  </div>
+</dialog>
+
 <dialog id="dlg-confirm">
   <h2 id="confirm-title"></h2>
   <p id="confirm-text"></p>

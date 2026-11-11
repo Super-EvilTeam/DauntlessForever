@@ -12,3 +12,16 @@ node_modules/
 /_wip1147/
 /_wip_launcher/
 /tools/relay/
+/Game
+
+# Python bytecode & temporary development scratch files
+__pycache__/
+*.pyc
+scratch/
+
+# Runtime Gauntlet state (user-generated configuration and active season marker)
+**/data/gauntlet.json
+**/data/gauntlet_season.txt
+
+# Dynamic Gauntlet customizer compiled pak (compiled on demand when player customizes)
+**/bin/zzzzzzzzzzzzzzzz_GauntletThreeBehemoths_P.pak

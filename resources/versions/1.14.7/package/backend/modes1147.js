@@ -5,6 +5,19 @@ const hunts=require('./modes1147-data.json');
 const SEASONS=['gauntlet-season1','gauntlet-season2','gauntlet-season3','gauntlet-season4','gauntlet-season5'];
 const DEFAULT_SEASON='gauntlet-season5', MAX_LEVEL=9999999;
 const SEASON_FILE=path.join(__dirname,'..','data','gauntlet_season.txt');
+const CFG_FILE=path.join(__dirname,'..','data','gauntlet.json');
+
+function isUnlockAll(season){
+ try{
+  if(fs.existsSync(CFG_FILE)){
+   const c=JSON.parse(fs.readFileSync(CFG_FILE,'utf8'));
+   if(c&&c.unlockAllLevels){
+    if(c.season==='all'||!c.season||('gauntlet-season'+c.season)===season)return true;
+   }
+  }
+ }catch{}
+ return false;
+}
 
 function getSeason(){
  if(process.env.DF_GAUNTLET_SEASON&&SEASONS.includes(process.env.DF_GAUNTLET_SEASON))return process.env.DF_GAUNTLET_SEASON;
@@ -51,7 +64,11 @@ function destination(b){
 }
 function create(ctx){
  function account(req,id){const found=ctx.getPlayers().filter(p=>p.accountId===id);if(found.length!==1)fail(404,'Gauntlet account not found');const p=found[0],token=ctx.bearerOf(req);if(token&&ctx.sessions.has(token)&&ctx.playerFor(req)!==p)fail(403,'Gauntlet account does not match signed-in player');return p;}
- function saved(p,s){const season=s||getSeason();const m=p.mega1147?.gauntlet1147?.[season];return m||{completed:[],highest:0};}
+ function saved(p,s){
+  const season=s||getSeason();const m=p.mega1147?.gauntlet1147?.[season];
+  if(isUnlockAll(season)){const comp=[];for(let k=1;k<=100;k++)comp.push(k);return{completed:comp,highest:100};}
+  return m||{completed:[],highest:0};
+ }
  function checkSeason(s){if(s!==getSeason())fail(404,'Gauntlet season is not available in this offline setup');}
  function finish(c){const b=c.body;if(!b||typeof b!=='object'||Array.isArray(b))fail(400,'Expected Gauntlet completion');checkSeason(b.gauntlet_id);
   const n=b.level;if(!Number.isSafeInteger(n)||n<1||n>MAX_LEVEL)fail(400,'Invalid completed Gauntlet level');

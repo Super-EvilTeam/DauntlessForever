@@ -890,6 +890,10 @@ ipcMain.handle('mods:act', async (_e, id, action, a, b) => {
   if (action === 'install') return runModsTool(v, ['install'], 300000);
   if (action === 'set' && ['on', 'off', 'servers-on', 'servers-off'].includes(a)) return runModsTool(v, ['set', a]);
   if (action === 'mod' && /^[\w .-]{1,80}$/.test(String(a)) && (b === 'on' || b === 'off')) return runModsTool(v, ['mod', String(a), b]);
+  if (action === 'gauntlet-get') return runModsTool(v, ['gauntlet-get']);
+  if (action === 'gauntlet-level-get') return runModsTool(v, ['gauntlet-level-get', String(a || 3), String(b || 1)]);
+  if (action === 'gauntlet-unlock-all') return runModsTool(v, ['gauntlet-unlock-all']);
+  if (action === 'gauntlet-set') return runModsTool(v, ['gauntlet-set', 'b64:' + Buffer.from(typeof a === 'string' ? a : JSON.stringify(a)).toString('base64')], 60000);
   if (action === 'folder') {
     const r = await runModsTool(v, ['status']);
     if (r && r.ok && r.folder && fs.existsSync(r.folder)) { shell.openPath(r.folder); return { ok: true }; }
