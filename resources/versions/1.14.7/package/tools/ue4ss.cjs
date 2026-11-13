@@ -100,7 +100,7 @@ const GAUNTLET_CFG_FILE = path.join(DATA, 'gauntlet.json');
 const GAUNTLET_MODIFIERS = [
   { id: 'HM_PUSHANDPULL', name: 'Push and Pull', desc: 'Gravitational shockwaves pulse across the arena floor', seasons: [3] },
   { id: 'HM_FAST_ATTACKS', name: 'Fast Attacks', desc: 'Accelerated Behemoth attack and recovery speed', seasons: [2] },
-  { id: 'HM_ELECTRIFY', name: 'Electrify', desc: 'Lightning orbs and shock auras periodically pulse', seasons: [1, 2, 3, 4, 5] },
+  { id: 'HM_ELECTRIFY', name: 'Electrify', desc: 'Lightning orbs and shock auras periodically pulse', seasons: [1, 2, 3] },
   { id: 'HM_COMBUSTION', name: 'Combustion', desc: 'Fiery explosions erupt under Slayers or on impacts', seasons: [1, 2, 3] },
   { id: 'HM_ENVIRONMENT_DEEPFREEZE', name: 'Deep Freeze', desc: 'Severe Frostbite cold slows stamina recovery', seasons: [2] },
   { id: 'HM_FURY', name: 'Fury', desc: 'Behemoths enrage faster, stay enraged longer, hit harder', seasons: [2] },

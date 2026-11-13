@@ -27,7 +27,11 @@ if (appData) {
     if (!fs.existsSync(dstDir)) continue;
 
     const files = ['tools/items.js'];
-    if (ver === '1.14.7') files.push('backend/modes1147.js');
+    if (ver === '1.14.7') {
+      files.push('backend/modes1147.js');
+      files.push('tools/gauntlet_patcher.py');
+      files.push('tools/ue4ss.cjs');
+    }
 
     for (const rel of files) {
       const src = path.join(__dirname, '..', 'resources', 'versions', ver, 'package', rel);

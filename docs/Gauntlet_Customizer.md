@@ -187,14 +187,14 @@ The CLI subcommand `python gauntlet_patcher.py inspect <season> <level>` deseria
 1. Resolves `GAUNTLET_S1_LEVEL` row offset.
 2. Extracts `TimeLimit` float.
 3. Iterates over all 5 rounds, extracting each round's `Arena`, Behemoth species list, and `Modifiers`.
-4. Gathers all Behemoth species present in that season's `.uasset` Name Table, pairing them with human-readable display names (e.g. `Bloodshot Shrowd (crowbear_alpha)`, `Torgadoro (armstrong_normal)`, `Flameborn Rezakiri (paper_heroic)`).
+4. Gathers all Behemoth species present in that season's `.uasset` Name Table, pairing them with human-readable display names (e.g. `Bloodshot Shrowd (crowbear_alpha)`, `Heroic Torgadoro (armstrong_heroic)`, `Flameborn Rezakiri (bugbear_blaze)`, `Heroic Koshai (paper_heroic)`).
 5. Emits structured JSON consumed directly by the launcher UI via IPC.
 
 ### 5.2 The 7-Point Cascading Offset Update
-When structs are inserted or deleted, the payload size of containing tags, array lengths, and `.uasset` export headers must be adjusted simultaneously:
+When structs are inserted, removed, or resized, the payload size of containing tags, array lengths, and `.uasset` export headers are adjusted simultaneously:
 
 1. **`Content` Tag Payload Size**: Offset `+0x10` of `Content` tag (`uint32` $\pm \text{delta}$).
-2. **`Content` Item Count**: First 4 bytes of `Content` raw payload (`uint32` $\pm 1$).
+2. **`Content` Item Count**: First 4 bytes of `Content` raw payload (`uint32` new count).
 3. **`Content` Inner Struct Size**: Offset `+0x14` of `Content` raw payload (`uint64` $\pm \text{delta}$).
 4. **`RoundStructures` Tag Payload Size**: Offset `+0x10` of `RoundStructures` tag (`uint32` $\pm \text{delta}$).
 5. **`RoundStructures` Inner Struct Size**: Offset `+0x14` of `RoundStructures` raw payload (`uint64` $\pm \text{delta}$).
@@ -203,12 +203,13 @@ When structs are inserted or deleted, the payload size of containing tags, array
 
 > [!IMPORTANT]
 > **Reverse-Order Offset Invariance**:
-> Inserting or deleting bytes alters the absolute offsets of all subsequent data. By sorting all scheduled patch operations in **descending order of file offset** (`reverse=True`), modifications at the end of the file never invalidate the target offsets of operations closer to the beginning.
+> Altering byte slice sizes modifies the absolute offsets of all subsequent file positions. By sorting all scheduled patch operations in **descending order of file offset** (`reverse=True`), modifications at the end of the file never invalidate target offsets closer to the beginning.
 
-### 5.3 Behemoth Slot Operations
-* **In-Place Substitution**: When replacing an existing Behemoth slot with a new species, the patcher writes the new `FName` index directly into `BehemothName` tag raw offset. File size delta is exactly `0`.
-* **Expansion (3-4 Behemoths)**: When scaling above existing slots, a 230-byte template struct is cloned, its `BehemothName` index is rewritten, and the struct is inserted with a $+230$ byte cascading delta.
-* **Reduction (1 Solo Behemoth)**: When reducing a dual round down to 1 Behemoth, the redundant struct slice is removed with a $-230$ byte cascading delta.
+### 5.3 Behemoth & Modifier Slot Operations
+Every entry in a round's `Content` array is a 230-byte `GauntletModeRoundContent` struct:
+* **Behemoth Entry**: `ContentType = EGauntletContentType::Behemoth` (offset 33), `BehemothName` (offset 66), and `Modifier.RowName = None` (offset 206).
+* **Hunt Modifier Entry**: `ContentType = EGauntletContentType::Modifier` (offset 33), `BehemothName = None` (offset 66), `BehemothLevel = 0` (offset 99), and `Modifier.RowName` pointing to the modifier FName (offset 206).
+* **Round Rebuilding**: Each round constructs its desired slice of Behemoth and Modifier structs. When the new payload differs from vanilla, the entire item slice is replaced in one clean operation, ensuring modifiers can be added to rounds with zero vanilla modifiers, updated, or removed cleanly.
 
 ---
 

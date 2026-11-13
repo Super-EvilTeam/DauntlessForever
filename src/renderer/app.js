@@ -749,9 +749,241 @@ async function renderMods() {
 }
 
 let gauntletData = null;
+let gauntletWindowInteractionsInitialized = false;
+
+function initGauntletWindowInteractions(dlg) {
+  if (gauntletWindowInteractionsInitialized || !dlg) return;
+  gauntletWindowInteractionsInitialized = true;
+
+  const header = $('gcfg-header');
+  const minBtn = $('gcfg-min-btn');
+  const maxBtn = $('gcfg-max-btn');
+  const closeBtn = $('gcfg-close-btn');
+  const grip = $('gcfg-resize-grip');
+
+  let isDragging = false;
+  let dragStartX = 0, dragStartY = 0;
+  let initialLeft = 0, initialTop = 0;
+
+  let isResizing = false;
+  let resizeStartX = 0, resizeStartY = 0;
+  let initialW = 0, initialH = 0;
+
+  let savedNormalGeometry = null;
+
+  function ensureAbsolutePosition() {
+    if (dlg.classList.contains('maximized') || dlg.classList.contains('minimized')) return;
+    const rect = dlg.getBoundingClientRect();
+    if (!dlg.style.left || dlg.style.margin !== '0px') {
+      dlg.style.margin = '0px';
+      dlg.style.left = Math.round(rect.left) + 'px';
+      dlg.style.top = Math.round(rect.top) + 'px';
+      dlg.style.width = Math.round(rect.width) + 'px';
+    }
+  }
+
+  // Header dragging
+  if (header) {
+    header.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.gauntlet-win-controls')) return;
+      if (dlg.classList.contains('minimized')) {
+        toggleMinimize();
+        return;
+      }
+      if (dlg.classList.contains('maximized')) return;
+      ensureAbsolutePosition();
+      const rect = dlg.getBoundingClientRect();
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      initialLeft = rect.left;
+      initialTop = rect.top;
+      try { header.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+
+    header.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      const maxLeft = Math.max(0, window.innerWidth - 120);
+      const maxTop = Math.max(0, window.innerHeight - 60);
+      const newLeft = Math.max(0, Math.min(maxLeft, initialLeft + dx));
+      const newTop = Math.max(34, Math.min(maxTop, initialTop + dy));
+      dlg.style.left = Math.round(newLeft) + 'px';
+      dlg.style.top = Math.round(newTop) + 'px';
+    });
+
+    const stopDrag = (e) => {
+      if (isDragging) {
+        isDragging = false;
+        try { header.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+    };
+    header.addEventListener('pointerup', stopDrag);
+    header.addEventListener('pointercancel', stopDrag);
+
+    // Double-click header toggles maximize / restore
+    header.addEventListener('dblclick', (e) => {
+      if (e.target.closest('.gauntlet-win-controls')) return;
+      toggleMaximize();
+    });
+  }
+
+  // Resize grip
+  if (grip) {
+    grip.addEventListener('pointerdown', (e) => {
+      if (dlg.classList.contains('maximized') || dlg.classList.contains('minimized')) return;
+      ensureAbsolutePosition();
+      const rect = dlg.getBoundingClientRect();
+      isResizing = true;
+      resizeStartX = e.clientX;
+      resizeStartY = e.clientY;
+      initialW = rect.width;
+      initialH = rect.height;
+      dlg.style.height = Math.round(rect.height) + 'px';
+      try { grip.setPointerCapture(e.pointerId); } catch (_) {}
+      e.stopPropagation();
+      e.preventDefault();
+    });
+
+    grip.addEventListener('pointermove', (e) => {
+      if (!isResizing) return;
+      const dx = e.clientX - resizeStartX;
+      const dy = e.clientY - resizeStartY;
+      const minW = 480, maxW = window.innerWidth - 20;
+      const minH = 380, maxH = window.innerHeight - 44;
+      const newW = Math.max(minW, Math.min(maxW, initialW + dx));
+      const newH = Math.max(minH, Math.min(maxH, initialH + dy));
+      dlg.style.width = Math.round(newW) + 'px';
+      dlg.style.height = Math.round(newH) + 'px';
+    });
+
+    const stopResize = (e) => {
+      if (isResizing) {
+        isResizing = false;
+        try { grip.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+    };
+    grip.addEventListener('pointerup', stopResize);
+    grip.addEventListener('pointercancel', stopResize);
+  }
+
+  // Maximize / Restore
+  function toggleMaximize() {
+    if (dlg.classList.contains('minimized')) {
+      dlg.classList.remove('minimized');
+    }
+    if (dlg.classList.contains('maximized')) {
+      dlg.classList.remove('maximized');
+      if (savedNormalGeometry) {
+        dlg.style.left = savedNormalGeometry.left;
+        dlg.style.top = savedNormalGeometry.top;
+        dlg.style.width = savedNormalGeometry.width;
+        dlg.style.height = savedNormalGeometry.height;
+        dlg.style.margin = savedNormalGeometry.margin || '0px';
+      }
+      if (maxBtn) {
+        maxBtn.title = 'Maximize';
+        maxBtn.setAttribute('aria-label', 'Maximize');
+      }
+    } else {
+      ensureAbsolutePosition();
+      savedNormalGeometry = {
+        left: dlg.style.left,
+        top: dlg.style.top,
+        width: dlg.style.width,
+        height: dlg.style.height,
+        margin: dlg.style.margin
+      };
+      dlg.classList.add('maximized');
+      if (maxBtn) {
+        maxBtn.title = 'Restore';
+        maxBtn.setAttribute('aria-label', 'Restore');
+      }
+    }
+  }
+
+  // Minimize / Unminimize
+  function toggleMinimize() {
+    if (dlg.classList.contains('minimized')) {
+      dlg.classList.remove('minimized');
+      if (minBtn) {
+        minBtn.title = 'Minimize';
+        minBtn.setAttribute('aria-label', 'Minimize');
+      }
+      if (savedNormalGeometry) {
+        dlg.style.left = savedNormalGeometry.left;
+        dlg.style.top = savedNormalGeometry.top;
+        dlg.style.width = savedNormalGeometry.width;
+        dlg.style.height = savedNormalGeometry.height;
+        dlg.style.margin = savedNormalGeometry.margin || '0px';
+      }
+    } else {
+      if (!dlg.classList.contains('maximized')) {
+        ensureAbsolutePosition();
+        savedNormalGeometry = {
+          left: dlg.style.left,
+          top: dlg.style.top,
+          width: dlg.style.width,
+          height: dlg.style.height,
+          margin: dlg.style.margin
+        };
+      }
+      dlg.classList.remove('maximized');
+      dlg.classList.add('minimized');
+      if (minBtn) {
+        minBtn.title = 'Restore';
+        minBtn.setAttribute('aria-label', 'Restore');
+      }
+    }
+  }
+
+  if (minBtn) {
+    minBtn.onclick = (e) => {
+      e.stopPropagation();
+      toggleMinimize();
+    };
+  }
+
+  if (maxBtn) {
+    maxBtn.onclick = (e) => {
+      e.stopPropagation();
+      toggleMaximize();
+    };
+  }
+
+  if (closeBtn) {
+    closeBtn.onclick = (e) => {
+      e.stopPropagation();
+      dlg.close();
+      dlg.classList.remove('minimized');
+      if (typeof renderMods === 'function') renderMods();
+    };
+  }
+
+  dlg.addEventListener('cancel', () => {
+    dlg.classList.remove('minimized');
+    if (typeof renderMods === 'function') renderMods();
+  });
+
+  window.addEventListener('resize', () => {
+    if (!dlg.open || dlg.classList.contains('maximized') || dlg.classList.contains('minimized')) return;
+    const rect = dlg.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      dlg.style.left = Math.max(0, window.innerWidth - rect.width - 16) + 'px';
+    }
+    if (rect.bottom > window.innerHeight) {
+      dlg.style.top = Math.max(34, window.innerHeight - rect.height - 16) + 'px';
+    }
+  });
+}
+
 async function openGauntletConfig() {
   const dlg = $('dlg-gauntlet');
   if (!dlg) return;
+  initGauntletWindowInteractions(dlg);
+  dlg.classList.remove('minimized');
+  dlg.style.height = 'auto';
   const status = $('gcfg-status');
   status.textContent = 'Loading configuration...';
   status.className = 'action-note';
@@ -1066,6 +1298,7 @@ async function openGauntletConfig() {
   $('gcfg-cancel').textContent = 'Cancel';
   $('gcfg-cancel').onclick = () => {
     dlg.close();
+    dlg.classList.remove('minimized');
     renderMods();
   };
 

@@ -18,35 +18,49 @@ CANDIDATES = [
 
 BEHEMOTH_NAMES = {
     'amber_normal': 'Alyra',
+    'amber_heroic': 'Heroic Alyra',
     'armstrong_normal': 'Torgadoro',
-    'armstrong_heroic': 'Winterhorn Skraev',
+    'armstrong_heroic': 'Heroic Torgadoro',
     'beaver_normal': 'Gnasher',
     'beaver_alpha': 'Ragetail Gnasher',
     'beaver_blaze': 'Flameborn Gnasher',
     'beaver_frost': 'Frostwisp Gnasher',
-    'bugbear_normal': 'Charrogg',
+    'beaver_heroic': 'Heroic Gnasher',
+    'bugbear_normal': 'Rezakiri',
+    'bugbear_blaze': 'Flameborn Rezakiri',
     'bullseye_normal': 'Quillshot',
     'bullseye_alpha': 'Deadeye Quillshot',
+    'bullseye_blaze': 'Flameborn Quillshot',
     'bullseye_heroic': 'Heroic Quillshot',
     'crowbear_normal': 'Shrowd',
     'crowbear_alpha': 'Bloodshot Shrowd',
+    'crowbear_heroic': 'Heroic Shrowd',
     'electroquill_normal': 'Nayzaga',
     'electroquill_alpha': 'Shockjaw Nayzaga',
+    'electroquill_umbral': 'Shadowtouched Nayzaga',
+    'electroquill_heroic': 'Heroic Nayzaga',
     'fulgar_normal': 'Drask',
     'fulgar_alpha': 'Thunderdeep Drask',
-    'glitter_normal': 'Valomyr',
-    'glitter_heroic': 'Heroic Valomyr',
-    'habanero_normal': 'Hellion',
+    'fulgar_umbral': 'Shadowtouched Drask',
+    'fulgar_heroic': 'Heroic Drask',
+    'funguy_normal': 'Agarus',
+    'funguy_heroic': 'Heroic Agarus',
+    'glitter_normal': 'Chronovore',
+    'glitter_heroic': 'Heroic Chronovore',
+    'habanero_normal': 'Phaelanx',
+    'habanero_heroic': 'Heroic Phaelanx',
     'host_normal': 'Boreus',
     'host_alpha': 'Dreadfrost Boreus',
     'host_radiant': 'Lightbound Boreus',
-    'lavaroller_normal': 'Charrogg',
-    'lavaroller_alpha': 'Firebrand Charrogg',
-    'lavaroller_heroic': 'Heroic Charrogg',
+    'host_heroic': 'Heroic Boreus',
+    'lavaroller_normal': 'Hellion',
+    'lavaroller_alpha': 'Scorchstone Hellion',
+    'lavaroller_heroic': 'Heroic Hellion',
     'lerawr_normal': 'Embermane',
     'lerawr_alpha': 'Bloodfire Embermane',
-    'lerawr_heroic': 'Flameborn Embermane',
+    'lerawr_heroic': 'Heroic Embermane',
     'mantis_normal': 'Sahvyt',
+    'mantis_heroic': 'Heroic Sahvyt',
     'mcrollin_normal': 'Pangar',
     'mcrollin_alpha': 'Frostback Pangar',
     'mcrollin_heroic': 'Heroic Pangar',
@@ -57,8 +71,8 @@ BEHEMOTH_NAMES = {
     'moonface_heroic': 'Heroic Shrike',
     'paper_normal': 'Koshai',
     'paper_radiant': 'Lightbound Koshai',
-    'paper_heroic': 'Flameborn Rezakiri',
     'paper_umbral': 'Shadowtouched Koshai',
+    'paper_heroic': 'Heroic Koshai',
     'randall_normal': 'Thrax',
     'randall_heroic': 'Heroic Thrax',
     'rock_normal': 'Skarn',
@@ -67,23 +81,27 @@ BEHEMOTH_NAMES = {
     'rock_heroic': 'Heroic Skarn',
     'sally_normal': 'Charrogg',
     'sally_alpha': 'Firebrand Charrogg',
+    'sally_heroic': 'Heroic Charrogg',
     'salt_normal': 'Valomyr',
     'salt_heroic': 'Heroic Valomyr',
     'scissors_normal': 'Kharabak',
     'scissors_alpha': 'Razorwing Kharabak',
+    'scissors_heroic': 'Heroic Kharabak',
     'shadowcat_normal': 'Riftstalker',
     'shadowcat_heroic': 'Heroic Riftstalker',
     'shockmane_normal': 'Stormclaw',
     'shockmane_alpha': 'Tempestborne Stormclaw',
     'shockmane_heroic': 'Heroic Stormclaw',
-    'snowflake_normal': 'Pangar',
-    'snowflake_alpha': 'Frostback Pangar',
-    'snowflake_heroic': 'Heroic Pangar',
+    'snowflake_normal': 'Skraev',
+    'snowflake_alpha': 'Winterhorn Skraev',
+    'snowflake_heroic': 'Heroic Winterhorn Skraev',
     'terramane_normal': 'Fenroar',
     'terramane_alpha': 'Sporestruck Fenroar',
+    'terramane_heroic': 'Heroic Fenroar',
     'thunderbird_normal': 'Malkarion',
     'thunderbird_heroic': 'Heroic Malkarion',
-    'wolf_normal': 'Frostwulf'
+    'wolf_normal': 'Frostwulf',
+    'wolf_heroic': 'Heroic Frostwulf',
 }
 
 DEFAULT_CONFIG = {
@@ -209,22 +227,39 @@ def inspect_level(season_num, level_num):
                         _, co = r_name(craw, co, names); _, co = r_name(craw, co, names); co += 8; _, co = r_name(craw, co, names); co += 17
                         for ci in range(cnum):
                             is_b = False
+                            is_m = False
                             bn = None
+                            mn = None
                             while co < len(craw):
                                 ctag, co = parse_tag(craw, co, names)
                                 if ctag['name'] == 'None': break
                                 if ctag['name'] == 'ContentType':
                                     i, _ = struct.unpack_from('<II', ctag['raw'], 0)
-                                    if i < len(names) and names[i] == 'EGauntletContentType::Behemoth': is_b = True
+                                    if i < len(names):
+                                        if names[i] == 'EGauntletContentType::Behemoth': is_b = True
+                                        elif names[i] == 'EGauntletContentType::Modifier': is_m = True
                                 elif ctag['name'] == 'BehemothName':
                                     i, _ = struct.unpack_from('<II', ctag['raw'], 0)
                                     if i < len(names): bn = names[i]
+                                elif ctag['name'] == 'Modifier':
+                                    mraw = ctag['raw']
+                                    mo = 0
+                                    while mo < len(mraw):
+                                        mtag, mo = parse_tag(mraw, mo, names)
+                                        if mtag['name'] == 'RowName':
+                                            ri, _ = struct.unpack_from('<II', mtag['raw'], 0)
+                                            if ri < len(names) and names[ri] != 'None':
+                                                mn = names[ri]
+                                        if mtag['name'] == 'None': break
                             if is_b and bn:
                                 behemoths.append(bn)
+                            if is_m and mn:
+                                modifiers.append(mn)
                 rounds.append({
                     'round': rnd + 1,
                     'arena': arena,
-                    'behemoths': behemoths
+                    'behemoths': behemoths,
+                    'modifiers': modifiers
                 })
                 
     avail_behemoths = []
@@ -265,15 +300,31 @@ def patch_spec_file(spec_name, cfg, out_dir):
     orig_u_len = len(u)
     names = get_uasset_names(u)
     
-    mod_name_indices = []
-    for m in cfg.get('modifiers', []):
-        if m in names:
-            mod_name_indices.append(names.index(m))
-            
     if 'GAUNTLET_S1_LEVEL' not in names:
         return False
     l_idx = names.index('GAUNTLET_S1_LEVEL')
     
+    mod_ct_idx = names.index('EGauntletContentType::Modifier') if 'EGauntletContentType::Modifier' in names else None
+    b_ct_idx = names.index('EGauntletContentType::Behemoth') if 'EGauntletContentType::Behemoth' in names else None
+    none_idx = names.index('None') if 'None' in names else 0
+    
+    b_template = None
+    m_template = None
+    if b_ct_idx is not None:
+        b_pos = b.find(struct.pack('<II', b_ct_idx, 0))
+        if b_pos != -1:
+            b_template = bytearray(b[b_pos - 33 : b_pos - 33 + 230])
+    if mod_ct_idx is not None:
+        m_pos = b.find(struct.pack('<II', mod_ct_idx, 0))
+        if m_pos != -1:
+            m_template = bytearray(b[m_pos - 33 : m_pos - 33 + 230])
+    if m_template is None and b_template is not None and mod_ct_idx is not None:
+        m_template = bytearray(b_template)
+        struct.pack_into('<I', m_template, 33, mod_ct_idx)
+        struct.pack_into('<I', m_template, 66, none_idx)
+        struct.pack_into('<i', m_template, 99, 0)
+        struct.pack_into('<I', m_template, 206, none_idx)
+        
     rows = []
     for num in range(2, 35):
         pos = b.find(struct.pack('<II', l_idx, num))
@@ -285,8 +336,9 @@ def patch_spec_file(spec_name, cfg, out_dir):
     level_config = cfg.get('levelConfig', {})
     desired_behemoth_count = int(cfg.get('behemothCount', 3))
     time_limit = float(cfg.get('timeLimitSeconds', 0))
+    global_modifiers = cfg.get('modifiers', [])
     
-    levels_to_patch = []
+    round_ops = []
     for lvl, p in rows:
         lvl_str = str(lvl)
         is_custom_lvl = (not all_levels) and (lvl in target_levels or lvl_str in level_config)
@@ -298,7 +350,6 @@ def patch_spec_file(spec_name, cfg, out_dir):
         o = p
         rname, o = r_name(b, o, names)
         
-        round_ops = []
         while o < len(b):
             tag, o = parse_tag(b, o, names)
             if tag['name'] == 'None': break
@@ -349,6 +400,7 @@ def patch_spec_file(spec_name, cfg, out_dir):
                                 is_b = False
                                 is_m = False
                                 bn = None
+                                mn = None
                                 while co < len(craw):
                                     ctag, co = parse_tag(craw, co, names)
                                     if ctag['name'] == 'None': break
@@ -360,197 +412,102 @@ def patch_spec_file(spec_name, cfg, out_dir):
                                     elif ctag['name'] == 'BehemothName':
                                         i, _ = struct.unpack_from('<II', ctag['raw'], 0)
                                         if i < len(names): bn = names[i]
+                                    elif ctag['name'] == 'Modifier':
+                                        mraw = ctag['raw']
+                                        mo = 0
+                                        while mo < len(mraw):
+                                            mtag, mo = parse_tag(mraw, mo, names)
+                                            if mtag['name'] == 'RowName':
+                                                ri, _ = struct.unpack_from('<II', mtag['raw'], 0)
+                                                if ri < len(names) and names[ri] != 'None':
+                                                    mn = names[ri]
+                                            if mtag['name'] == 'None': break
                                 item_end = co
-                                if is_b: b_items.append((ci, item_start, item_end, bn))
-                                if is_m: m_items.append((ci, item_start, item_end))
-                                
-                            new_items_to_insert = []
-                            
-                            # Specific level custom config branch
-                            if rnd_cfg and 'behemoths' in rnd_cfg:
-                                want_b = rnd_cfg['behemoths']
-                                # Replace existing slots in place
-                                for slot in range(min(len(want_b), len(b_items))):
-                                    b_choice = want_b[slot]
-                                    if b_choice in names:
-                                        sco = b_items[slot][1]
-                                        while sco < b_items[slot][2]:
-                                            ctag, sco = parse_tag(craw, sco, names)
-                                            if ctag['name'] == 'BehemothName':
-                                                bn_abs = tag['raw_start'] + rtag['raw_start'] + ctag['raw_start']
-                                                struct.pack_into('<I', b, bn_abs, names.index(b_choice))
-                                                break
-                                                
-                                # Insert extra slots if user wants more than existing
-                                if len(want_b) > len(b_items) and b_items:
-                                    template_item = craw[b_items[0][1] : b_items[0][2]]
-                                    for extra_b in want_b[len(b_items):]:
-                                        if extra_b in names:
-                                            item_new = bytearray(template_item)
-                                            t_co = 0
-                                            while t_co < len(item_new):
-                                                ctag, t_co = parse_tag(item_new, t_co, names)
-                                                if ctag['name'] == 'BehemothName':
-                                                    struct.pack_into('<I', item_new, ctag['raw_start'], names.index(extra_b))
-                                                    new_items_to_insert.append(item_new)
-                                                    break
-                                                    
-                                if new_items_to_insert:
-                                    insert_pos = tag['raw_start'] + rtag['raw_start'] + b_items[-1][2]
-                                    round_ops.append({
-                                        'type': 'insert',
-                                        'pos': insert_pos,
-                                        'items': new_items_to_insert,
-                                        'c_tag_sz_off': c_tag_sz_off,
-                                        'c_num_items_off': c_num_items_off,
-                                        'c_inner_sz_off': c_inner_sz_off,
-                                        'r_tag_sz_off': r_tag_sz_off,
-                                        'r_inner_sz_off': r_inner_sz_off
-                                    })
+                                if is_b and bn:
+                                    b_items.append({'ci': ci, 'raw': craw[item_start:item_end], 'name': bn})
+                                elif is_m:
+                                    m_items.append({'ci': ci, 'raw': craw[item_start:item_end], 'name': mn})
                                     
-                                # Delete slots if user wants fewer than existing
-                                if len(want_b) < len(b_items):
-                                    for del_slot in range(len(want_b), len(b_items)):
-                                        del_start = tag['raw_start'] + rtag['raw_start'] + b_items[del_slot][1]
-                                        del_end = tag['raw_start'] + rtag['raw_start'] + b_items[del_slot][2]
-                                        round_ops.append({
-                                            'type': 'delete',
-                                            'pos': del_start,
-                                            'end': del_end,
-                                            'sz': del_end - del_start,
-                                            'c_tag_sz_off': c_tag_sz_off,
-                                            'c_num_items_off': c_num_items_off,
-                                            'c_inner_sz_off': c_inner_sz_off,
-                                            'r_tag_sz_off': r_tag_sz_off,
-                                            'r_inner_sz_off': r_inner_sz_off
-                                        })
-                                        
-                                # Modifiers for this specific round
-                                rnd_mods = rnd_cfg.get('modifiers')
-                                active_mod_indices = [names.index(m) for m in rnd_mods if m in names] if rnd_mods is not None else mod_name_indices
-                                if active_mod_indices and m_items:
-                                    first_m_abs = tag['raw_start'] + rtag['raw_start'] + m_items[0][1]
-                                    struct.pack_into('<I', b, first_m_abs + 206, active_mod_indices[0])
-                                    if len(active_mod_indices) > 1:
-                                        template_m = craw[m_items[0][1] : m_items[0][2]]
-                                        for extra_m_idx in active_mod_indices[1:]:
-                                            mod_new = bytearray(template_m)
-                                            struct.pack_into('<I', mod_new, 206, extra_m_idx)
-                                            round_ops.append({
-                                                'type': 'insert',
-                                                'pos': tag['raw_start'] + rtag['raw_start'] + b_items[-1][2],
-                                                'items': [mod_new],
-                                                'c_tag_sz_off': c_tag_sz_off,
-                                                'c_num_items_off': c_num_items_off,
-                                                'c_inner_sz_off': c_inner_sz_off,
-                                                'r_tag_sz_off': r_tag_sz_off,
-                                                'r_inner_sz_off': r_inner_sz_off
-                                            })
+                            if rnd_cfg:
+                                want_b = rnd_cfg.get('behemoths', [bi['name'] for bi in b_items])
+                                want_m = rnd_cfg.get('modifiers', [mi['name'] for mi in m_items if mi['name']])
                             else:
-                                # Global dual-behemoth modification branch
-                                should_add_behemoth = (len(b_items) == 2 and desired_behemoth_count >= 3)
-                                existing_behemoths = [bi[3] for bi in b_items]
-                                
-                                if mod_name_indices and m_items:
-                                    first_m_abs = tag['raw_start'] + rtag['raw_start'] + m_items[0][1]
-                                    struct.pack_into('<I', b, first_m_abs + 206, mod_name_indices[0])
-                                    
-                                if should_add_behemoth and b_items:
-                                    template_item = craw[b_items[0][1] : b_items[0][2]]
-                                    pick = None
-                                    for cand in CANDIDATES:
-                                        if cand in names and cand not in existing_behemoths:
-                                            pick = cand
-                                            break
-                                    if not pick:
+                                if all_levels and len(b_items) == 2:
+                                    existing_behemoths = [bi['name'] for bi in b_items]
+                                    want_b = list(existing_behemoths)
+                                    if desired_behemoth_count >= 3:
+                                        pick = None
                                         for cand in CANDIDATES:
-                                            if cand in names: pick = cand; break
-                                    if not pick: pick = CANDIDATES[0]
-                                    pick_idx = names.index(pick)
-                                    
-                                    item_new = bytearray(template_item)
-                                    struct.pack_into('<I', item_new, 66, pick_idx)
-                                    new_items_to_insert.append(item_new)
-                                    
+                                            if cand in names and cand not in want_b:
+                                                pick = cand; break
+                                        if not pick:
+                                            for cand in CANDIDATES:
+                                                if cand in names: pick = cand; break
+                                        if not pick: pick = CANDIDATES[0]
+                                        want_b.append(pick)
                                     if desired_behemoth_count >= 4:
                                         pick2 = None
                                         for cand in CANDIDATES:
-                                            if cand in names and cand not in existing_behemoths and cand != pick:
+                                            if cand in names and cand not in want_b:
                                                 pick2 = cand; break
                                         if not pick2: pick2 = CANDIDATES[1]
-                                        if pick2 in names:
-                                            pick2_idx = names.index(pick2)
-                                            item_new2 = bytearray(template_item)
-                                            struct.pack_into('<I', item_new2, 66, pick2_idx)
-                                            new_items_to_insert.append(item_new2)
-                                            
-                                if len(mod_name_indices) > 1 and m_items:
-                                    template_m = craw[m_items[0][1] : m_items[0][2]]
-                                    for extra_mod_idx in mod_name_indices[1:]:
-                                        mod_new = bytearray(template_m)
-                                        struct.pack_into('<I', mod_new, 206, extra_mod_idx)
-                                        new_items_to_insert.append(mod_new)
-                                        
-                                if new_items_to_insert:
-                                    insert_pos = tag['raw_start'] + rtag['raw_start'] + (b_items[-1][2] if b_items else 0)
-                                    round_ops.append({
-                                        'type': 'insert',
-                                        'pos': insert_pos,
-                                        'items': new_items_to_insert,
-                                        'c_tag_sz_off': c_tag_sz_off,
-                                        'c_num_items_off': c_num_items_off,
-                                        'c_inner_sz_off': c_inner_sz_off,
-                                        'r_tag_sz_off': r_tag_sz_off,
-                                        'r_inner_sz_off': r_inner_sz_off
-                                    })
+                                        want_b.append(pick2)
+                                    elif desired_behemoth_count == 1:
+                                        want_b = want_b[:1]
+                                    want_m = global_modifiers
+                                else:
+                                    want_b = [bi['name'] for bi in b_items]
+                                    want_m = [mi['name'] for mi in m_items if mi['name']]
                                     
-        if round_ops:
-            levels_to_patch.append(round_ops)
-            
-    # Flatten all ops and execute in reverse order of position
-    all_ops = []
-    for ops in levels_to_patch:
-        for op in ops:
-            if op['type'] == 'insert':
-                for itm in op['items']:
-                    all_ops.append({
-                        'type': 'insert',
-                        'pos': op['pos'],
-                        'item': itm,
-                        'delta': len(itm),
-                        'c_tag_sz_off': op['c_tag_sz_off'],
-                        'c_num_items_off': op['c_num_items_off'],
-                        'c_inner_sz_off': op['c_inner_sz_off'],
-                        'r_tag_sz_off': op['r_tag_sz_off'],
-                        'r_inner_sz_off': op['r_inner_sz_off']
-                    })
-            elif op['type'] == 'delete':
-                all_ops.append({
-                    'type': 'delete',
-                    'pos': op['pos'],
-                    'end': op['end'],
-                    'delta': -op['sz'],
-                    'c_tag_sz_off': op['c_tag_sz_off'],
-                    'c_num_items_off': op['c_num_items_off'],
-                    'c_inner_sz_off': op['c_inner_sz_off'],
-                    'r_tag_sz_off': op['r_tag_sz_off'],
-                    'r_inner_sz_off': op['r_inner_sz_off']
-                })
-                
-    all_ops.sort(key=lambda x: x['pos'], reverse=True)
+                            valid_b = [x for x in want_b if x in names]
+                            valid_m = [x for x in want_m if x in names] if mod_ct_idx is not None else []
+                            
+                            new_items = []
+                            for s_idx, bn in enumerate(valid_b):
+                                if s_idx < len(b_items):
+                                    itm = bytearray(b_items[s_idx]['raw'])
+                                    struct.pack_into('<I', itm, 66, names.index(bn))
+                                    new_items.append(itm)
+                                else:
+                                    itm = bytearray(b_items[0]['raw'] if b_items else b_template)
+                                    struct.pack_into('<I', itm, 33, b_ct_idx)
+                                    struct.pack_into('<I', itm, 66, names.index(bn))
+                                    struct.pack_into('<I', itm, 206, none_idx)
+                                    new_items.append(itm)
+                                    
+                            for mn in valid_m:
+                                itm = bytearray(m_template)
+                                struct.pack_into('<I', itm, 33, mod_ct_idx)
+                                struct.pack_into('<I', itm, 66, none_idx)
+                                struct.pack_into('<i', itm, 99, 0)
+                                struct.pack_into('<I', itm, 206, names.index(mn))
+                                new_items.append(itm)
+                                
+                            old_bytes = craw[53:]
+                            new_bytes = b''.join(new_items)
+                            if new_bytes != old_bytes:
+                                abs_start = tag['raw_start'] + rtag['raw_start'] + 53
+                                abs_end = tag['raw_start'] + rtag['raw_start'] + len(craw)
+                                round_ops.append({
+                                    'pos': abs_start,
+                                    'end': abs_end,
+                                    'new_bytes': new_bytes,
+                                    'count': len(new_items),
+                                    'delta': len(new_bytes) - len(old_bytes),
+                                    'c_num_items_off': c_num_items_off,
+                                    'c_tag_sz_off': c_tag_sz_off,
+                                    'c_inner_sz_off': c_inner_sz_off,
+                                    'r_tag_sz_off': r_tag_sz_off,
+                                    'r_inner_sz_off': r_inner_sz_off
+                                })
+                                
+    round_ops.sort(key=lambda x: x['pos'], reverse=True)
     total_delta = 0
-    for op in all_ops:
+    for op in round_ops:
         d = op['delta']
-        if op['type'] == 'insert':
-            itm = op['item']
-            b[op['pos']:op['pos']] = itm
-            c_num = struct.unpack_from('<I', b, op['c_num_items_off'])[0]
-            struct.pack_into('<I', b, op['c_num_items_off'], c_num + 1)
-        elif op['type'] == 'delete':
-            del b[op['pos']:op['end']]
-            c_num = struct.unpack_from('<I', b, op['c_num_items_off'])[0]
-            struct.pack_into('<I', b, op['c_num_items_off'], c_num - 1)
-            
+        b[op['pos']:op['end']] = op['new_bytes']
+        struct.pack_into('<I', b, op['c_num_items_off'], op['count'])
+        
         c_sz = struct.unpack_from('<I', b, op['c_tag_sz_off'])[0]
         struct.pack_into('<I', b, op['c_tag_sz_off'], c_sz + d)
         c_inner = struct.unpack_from('<Q', b, op['c_inner_sz_off'])[0]
