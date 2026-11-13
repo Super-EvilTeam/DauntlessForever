@@ -892,6 +892,7 @@ ipcMain.handle('mods:act', async (_e, id, action, a, b) => {
   if (action === 'mod' && /^[\w .-]{1,80}$/.test(String(a)) && (b === 'on' || b === 'off')) return runModsTool(v, ['mod', String(a), b]);
   if (action === 'gauntlet-get') return runModsTool(v, ['gauntlet-get']);
   if (action === 'gauntlet-level-get') return runModsTool(v, ['gauntlet-level-get', String(a || 3), String(b || 1)]);
+  if (action === 'gauntlet-random-season') return runModsTool(v, ['gauntlet-random-season', String(a || 3), 'b64:' + Buffer.from(typeof b === 'string' ? b : JSON.stringify(b || {})).toString('base64')], 60000);
   if (action === 'gauntlet-unlock-all') return runModsTool(v, ['gauntlet-unlock-all']);
   if (action === 'gauntlet-set') return runModsTool(v, ['gauntlet-set', 'b64:' + Buffer.from(typeof a === 'string' ? a : JSON.stringify(a)).toString('base64')], 60000);
   if (action === 'folder') {

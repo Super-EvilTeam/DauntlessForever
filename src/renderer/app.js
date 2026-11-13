@@ -1251,15 +1251,18 @@ async function openGauntletConfig() {
 
   // ---------------- Random Custom Season Generator ----------------
   const randPanel = $('gcfg-random-panel');
+  const randErr = $('gcfg-rand-err');
   $('gcfg-random-btn').onclick = () => {
     $('gcfg-rand-season').value = $('gcfg-season').value === 'all' ? '3' : $('gcfg-season').value;
     const sCur = $('gcfg-rand-season').value;
     $('gcfg-rand-name').value = 'Random Season ' + sCur;
+    if (randErr) { randErr.textContent = ''; randErr.style.display = 'none'; }
     randPanel.hidden = false;
   };
   $('gcfg-rand-close').onclick = () => { randPanel.hidden = true; };
   $('gcfg-rand-cancel').onclick = () => { randPanel.hidden = true; };
   $('gcfg-rand-confirm').onclick = async () => {
+    if (randErr) { randErr.textContent = ''; randErr.style.display = 'none'; }
     const s = $('gcfg-rand-season').value;
     const lvlCount = Number($('gcfg-rand-levels').value || 20);
     const density = $('gcfg-rand-density').value;
@@ -1285,8 +1288,13 @@ async function openGauntletConfig() {
     $('gcfg-rand-confirm').disabled = false;
 
     if (!randRes || !randRes.ok || !randRes.levelConfig) {
-      status.textContent = (randRes && randRes.error) || 'Failed to generate random season.';
+      const errMsg = (randRes && randRes.error) || 'Failed to generate random season.';
+      status.textContent = errMsg;
       status.className = 'action-note err';
+      if (randErr) {
+        randErr.textContent = errMsg;
+        randErr.style.display = 'block';
+      }
       return;
     }
 
