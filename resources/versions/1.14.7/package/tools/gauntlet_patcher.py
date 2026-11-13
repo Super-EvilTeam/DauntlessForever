@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Dauntless Forever - Dynamic Gauntlet Encounter Patcher
-import struct, json, sys, os, shutil, tempfile
+import struct, json, sys, os, shutil, tempfile, random
 from pathlib import Path
 import repak
 
@@ -286,6 +286,144 @@ def inspect_level(season_num, level_num):
             ],
             'behemoths': avail_behemoths
         }
+    }
+
+def generate_random_season(season_num=3, options=None):
+    if options is None:
+        options = {}
+    elif isinstance(options, str):
+        s = options.strip()
+        if s.startswith('b64:'):
+            import base64
+            try:
+                s = base64.b64decode(s[4:]).decode('utf-8', 'ignore')
+            except Exception:
+                pass
+        try:
+            options = json.loads(s)
+        except Exception:
+            options = {}
+            
+    spec_map = {
+        1: 'gauntlet_mode_encounter_specs',
+        2: 'gauntlet_mode_encounter_specs_s2',
+        3: 'gauntlet_mode_encounter_specs_s3',
+        4: 'gauntlet_mode_encounter_specs_s4',
+        5: 'gauntlet_mode_encounter_specs_s5'
+    }
+    s_idx = int(season_num) if str(season_num).isdigit() else 3
+    if s_idx < 1 or s_idx > 5:
+        s_idx = 3
+    max_lvls = 16 if s_idx >= 4 else 20
+    
+    req_lvls = options.get('levelCount', max_lvls)
+    try:
+        level_count = max(1, min(int(req_lvls), max_lvls))
+    except Exception:
+        level_count = max_lvls
+        
+    density = str(options.get('density', 'progressive')).lower()
+    modifier_intensity = str(options.get('modifierIntensity', 'progressive')).lower()
+    timer_mode = str(options.get('timerMode', 'default')).lower()
+    
+    spec_name = spec_map[s_idx]
+    uasset_path = BASE_ASSETS_DIR / f'{spec_name}.uasset'
+    if not uasset_path.exists():
+        return {'ok': False, 'error': f'Base asset {spec_name} not found.'}
+        
+    names = get_uasset_names(uasset_path.read_bytes())
+    avail_behemoths = [bn for bn in BEHEMOTH_NAMES if bn in names]
+    if not avail_behemoths:
+        avail_behemoths = [n for n in names if ('_normal' in n or '_alpha' in n or '_heroic' in n) and n != 'None']
+    avail_modifiers = [n for n in names if n.startswith('HM_') and n != 'HM_TEST_SELF_REVIVE']
+    
+    arenas = ['EGauntletArena::Plaza', 'EGauntletArena::Forge', 'EGauntletArena::Hangar']
+    
+    timer_seconds = 420.0
+    if timer_mode == 'speedrun':
+        timer_seconds = 180.0
+    elif timer_mode == 'fast':
+        timer_seconds = 300.0
+    elif timer_mode == 'endurance':
+        timer_seconds = 600.0
+    elif timer_mode == 'marathon':
+        timer_seconds = 900.0
+    else:
+        try:
+            val = float(options.get('timerSeconds', timer_mode))
+            if val > 0:
+                timer_seconds = val
+        except Exception:
+            timer_seconds = 420.0
+            
+    level_cfg = {}
+    for lvl in range(1, level_count + 1):
+        rounds = []
+        for rnd in range(1, 6):
+            arena = random.choice(arenas)
+            
+            if density == 'solo':
+                b_count = 1
+            elif density == 'duo':
+                b_count = 2
+            elif density == 'trio':
+                b_count = 3
+            elif density == 'chaos':
+                b_count = random.choices([2, 3, 4], weights=[0.1, 0.45, 0.45])[0]
+            elif density == 'varied':
+                b_count = random.choice([1, 2, 3, 4])
+            else: # progressive
+                if lvl <= 3:
+                    weights = [0.6, 0.4, 0.0, 0.0]
+                elif lvl <= 7:
+                    weights = [0.2, 0.6, 0.2, 0.0]
+                elif lvl <= 12:
+                    weights = [0.05, 0.45, 0.4, 0.1]
+                elif lvl <= 16:
+                    weights = [0.0, 0.2, 0.5, 0.3]
+                else:
+                    weights = [0.0, 0.1, 0.45, 0.45]
+                b_count = random.choices([1, 2, 3, 4], weights=weights)[0]
+                
+            picked_b = random.sample(avail_behemoths, min(b_count, len(avail_behemoths)))
+            
+            picked_m = []
+            if avail_modifiers and modifier_intensity != 'vanilla':
+                if modifier_intensity == 'chaos':
+                    m_count = random.choices([1, 2, 3], weights=[0.35, 0.45, 0.20])[0]
+                elif modifier_intensity == 'mild':
+                    m_count = random.choices([0, 1], weights=[0.5, 0.5])[0]
+                else: # progressive
+                    if lvl <= 4:
+                        m_count = random.choices([0, 1], weights=[0.65, 0.35])[0]
+                    elif lvl <= 10:
+                        m_count = random.choices([0, 1, 2], weights=[0.25, 0.55, 0.20])[0]
+                    elif lvl <= 15:
+                        m_count = random.choices([1, 2, 3], weights=[0.30, 0.50, 0.20])[0]
+                    else:
+                        m_count = random.choices([1, 2, 3], weights=[0.20, 0.50, 0.30])[0]
+                if m_count > 0:
+                    picked_m = random.sample(avail_modifiers, min(m_count, len(avail_modifiers)))
+                    
+            rounds.append({
+                'round': rnd,
+                'arena': arena,
+                'behemoths': picked_b,
+                'modifiers': picked_m
+            })
+            
+        level_cfg[str(lvl)] = {
+            'timeLimit': timer_seconds,
+            'rounds': rounds
+        }
+        
+    return {
+        'ok': True,
+        'season': s_idx,
+        'levelCount': level_count,
+        'density': density,
+        'modifierIntensity': modifier_intensity,
+        'levelConfig': level_cfg
     }
 
 def patch_spec_file(spec_name, cfg, out_dir):
@@ -600,6 +738,13 @@ if __name__ == '__main__':
         s = sys.argv[2] if len(sys.argv) > 2 else 3
         l = sys.argv[3] if len(sys.argv) > 3 else 1
         res = inspect_level(s, l)
+        print(json.dumps(res))
+        sys.exit(0)
+
+    if len(sys.argv) > 1 and sys.argv[1] == 'random-season':
+        s = sys.argv[2] if len(sys.argv) > 2 else 3
+        opts = sys.argv[3] if len(sys.argv) > 3 else '{}'
+        res = generate_random_season(s, opts)
         print(json.dumps(res))
         sys.exit(0)
 

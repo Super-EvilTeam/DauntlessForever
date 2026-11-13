@@ -819,6 +819,28 @@
       </div>
     </div>
 
+    <!-- Gauntlet Template & Generator Toolbar -->
+    <div class="gauntlet-template-bar" id="gcfg-template-bar">
+      <div class="gauntlet-template-tools">
+        <button type="button" class="gauntlet-btn-tool" id="gcfg-random-btn" title="Generate procedural custom season with custom levels, modifiers, and behemoths">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+          <span>Randomize Season</span>
+        </button>
+        <button type="button" class="gauntlet-btn-tool" id="gcfg-export-btn" title="Export current custom season template as JSON to share with others">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          <span>Export Template</span>
+        </button>
+        <button type="button" class="gauntlet-btn-tool" id="gcfg-import-btn" title="Import a custom season template (.gauntlet.json) to play or tweak">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          <span>Import Template</span>
+        </button>
+        <input type="file" id="gcfg-import-file" accept=".json,.gauntlet.json" style="display: none;">
+      </div>
+      <div class="gauntlet-template-info">
+        <span id="gcfg-template-pill" class="gauntlet-badge-subtle" style="display: none;">Template Active</span>
+      </div>
+    </div>
+
     <!-- Global Mode: All Dual-Behemoth Levels -->
     <div id="gcfg-global-options" class="gcfg-global-split">
       <div class="gcfg-col-left">
@@ -932,6 +954,138 @@
     <div class="dlg-actions">
       <button type="button" class="ghost" id="gcfg-cancel">Cancel</button>
       <button type="button" class="primary small-btn" id="gcfg-save">Save & Apply</button>
+    </div>
+  </div>
+
+  <!-- Random Custom Season Overlay -->
+  <div class="gauntlet-overlay-panel" id="gcfg-random-panel" hidden>
+    <div class="gauntlet-overlay-card">
+      <div class="gauntlet-overlay-header">
+        <div>
+          <h3>Random Custom Season Generator</h3>
+          <p class="small" style="color: var(--ink-2); margin-top: 2px;">Generate procedural levels with escalating behemoth density, modifiers, and arenas.</p>
+        </div>
+        <button type="button" class="gauntlet-win-btn gauntlet-win-close" id="gcfg-rand-close" title="Close" aria-label="Close">
+          <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <div class="gauntlet-overlay-body">
+        <div class="gauntlet-overlay-grid">
+          <div class="gauntlet-field">
+            <label class="report-label" for="gcfg-rand-season">Target Season</label>
+            <select id="gcfg-rand-season" class="fr-input">
+              <option value="1">Season 1</option>
+              <option value="2">Season 2</option>
+              <option value="3" selected>Season 3 (Active)</option>
+              <option value="4">Season 4</option>
+              <option value="5">Season 5</option>
+            </select>
+          </div>
+
+          <div class="gauntlet-field">
+            <label class="report-label" for="gcfg-rand-levels">Number of Levels</label>
+            <select id="gcfg-rand-levels" class="fr-input">
+              <option value="5">5 Levels (Quick Rush)</option>
+              <option value="10">10 Levels (Standard)</option>
+              <option value="15">15 Levels (Extended)</option>
+              <option value="20" selected>20 Levels (Full Season)</option>
+            </select>
+          </div>
+
+          <div class="gauntlet-field">
+            <label class="report-label" for="gcfg-rand-density">Behemoth Density Progression</label>
+            <select id="gcfg-rand-density" class="fr-input">
+              <option value="progressive" selected>Progressive (Solo early to Duo to Trio to Brawl endgame)</option>
+              <option value="duo">Duo Focus (Dual behemoths on every round)</option>
+              <option value="trio">Trio Focus (3 behemoths per round)</option>
+              <option value="chaos">High Density Chaos (Trio and Brawl across all levels)</option>
+              <option value="varied">Varied Mix (Random mix of Solo, Duo, Trio, Brawl)</option>
+            </select>
+          </div>
+
+          <div class="gauntlet-field">
+            <label class="report-label" for="gcfg-rand-mod-intensity">Modifier Intensity</label>
+            <select id="gcfg-rand-mod-intensity" class="fr-input">
+              <option value="progressive" selected>Progressive (Clean early to 1-2 mid to 2-3 endgame)</option>
+              <option value="chaos">Full Chaos (1-3 active modifiers on every round)</option>
+              <option value="mild">Mild (0-1 modifier per round)</option>
+              <option value="vanilla">Vanilla (No extra modifiers)</option>
+            </select>
+          </div>
+
+          <div class="gauntlet-field">
+            <label class="report-label" for="gcfg-rand-timer">Starting Match Timer</label>
+            <select id="gcfg-rand-timer" class="fr-input">
+              <option value="default" selected>Default (07:00)</option>
+              <option value="speedrun">Speedrun (03:00)</option>
+              <option value="fast">Fast (05:00)</option>
+              <option value="endurance">Endurance (10:00)</option>
+              <option value="marathon">Marathon (15:00)</option>
+            </select>
+          </div>
+
+          <div class="gauntlet-field">
+            <label class="report-label" for="gcfg-rand-name">Custom Season Name</label>
+            <input id="gcfg-rand-name" class="fr-input" type="text" placeholder="e.g. Shattered Isles Gauntlet S3" maxlength="60">
+          </div>
+        </div>
+
+        <p class="small" style="color: var(--ink-2); margin-top: 14px; line-height: 1.4;">
+          Generates a full custom season configuration into the editor. You will be able to review, tweak any round or level, export the template to share, and apply it to your game.
+        </p>
+      </div>
+
+      <div class="gauntlet-overlay-footer">
+        <button type="button" class="ghost" id="gcfg-rand-cancel">Cancel</button>
+        <button type="button" class="primary small-btn" id="gcfg-rand-confirm">Generate & Load Season</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Custom Season Template Overlay -->
+  <div class="gauntlet-overlay-panel" id="gcfg-export-panel" hidden>
+    <div class="gauntlet-overlay-card" style="max-width: 620px;">
+      <div class="gauntlet-overlay-header">
+        <div>
+          <h3>Share Custom Season Template</h3>
+          <p class="small" style="color: var(--ink-2); margin-top: 2px;">Export your customized Gauntlet season so others can import and play it.</p>
+        </div>
+        <button type="button" class="gauntlet-win-btn gauntlet-win-close" id="gcfg-exp-close" title="Close" aria-label="Close">
+          <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <div class="gauntlet-overlay-body">
+        <div class="gauntlet-overlay-grid" style="grid-template-columns: 1fr 1fr;">
+          <div class="gauntlet-field">
+            <label class="report-label" for="gcfg-exp-name">Template Name</label>
+            <input id="gcfg-exp-name" class="fr-input" type="text" value="Custom Gauntlet Season" maxlength="60">
+          </div>
+          <div class="gauntlet-field">
+            <label class="report-label" for="gcfg-exp-author">Author / Slayer Name</label>
+            <input id="gcfg-exp-author" class="fr-input" type="text" placeholder="Anonymous Slayer" maxlength="40">
+          </div>
+          <div class="gauntlet-field" style="grid-column: 1 / -1;">
+            <label class="report-label" for="gcfg-exp-desc">Description</label>
+            <input id="gcfg-exp-desc" class="fr-input" type="text" placeholder="Custom Gauntlet season with handcrafted encounters and modifiers" maxlength="120">
+          </div>
+        </div>
+
+        <div class="gauntlet-field" style="margin-top: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label class="report-label" for="gcfg-exp-preview" style="margin: 0;">Template JSON Preview</label>
+            <span id="gcfg-exp-copy-feedback" class="small" style="color: var(--accent); display: none;">Copied to clipboard!</span>
+          </div>
+          <textarea id="gcfg-exp-preview" class="fr-input" rows="8" readonly style="font-family: monospace; font-size: 11px; resize: none; background: #0b0f15; color: #b8c7db; white-space: pre;"></textarea>
+        </div>
+      </div>
+
+      <div class="gauntlet-overlay-footer">
+        <button type="button" class="ghost" id="gcfg-exp-cancel">Cancel</button>
+        <button type="button" class="ghost" id="gcfg-exp-copy" style="margin-right: auto;">Copy to Clipboard</button>
+        <button type="button" class="primary small-btn" id="gcfg-exp-download">Download .gauntlet.json</button>
+      </div>
     </div>
   </div>
 

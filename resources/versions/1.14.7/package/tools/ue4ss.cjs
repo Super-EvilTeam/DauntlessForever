@@ -206,6 +206,21 @@ function gauntletLevelGet(season, level) {
   }
 }
 
+function gauntletRandomSeason(season, optsRaw) {
+  const patcher = path.join(ROOT, 'tools', 'gauntlet_patcher.py');
+  try {
+    const s = String(season || '3');
+    let optsStr = String(optsRaw || '{}').trim();
+    if (optsStr && !optsStr.startsWith('b64:')) {
+      optsStr = 'b64:' + Buffer.from(optsStr, 'utf8').toString('base64');
+    }
+    const outStr = execFileSync('python', [patcher, 'random-season', s, optsStr], { encoding: 'utf8', windowsHide: true, maxBuffer: 10 * 1024 * 1024 });
+    return JSON.parse(outStr.trim());
+  } catch (e) {
+    return { ok: false, error: 'Could not generate random season: ' + (e.message || String(e)) };
+  }
+}
+
 function gauntletSet(raw) {
   let cfg;
   try {
@@ -383,6 +398,7 @@ async function install() {
   }
   if (cmd === 'gauntlet-get') return out(gauntletGet());
   if (cmd === 'gauntlet-level-get') return out(gauntletLevelGet(a, b));
+  if (cmd === 'gauntlet-random-season') return out(gauntletRandomSeason(a, process.argv.slice(4).join(' ')));
   if (cmd === 'gauntlet-set') return out(gauntletSet(process.argv.slice(3).join(' ')));
   if (cmd === 'gauntlet-unlock-all') return out({ ok: unlockGauntletLevels('all'), message: 'All 5 seasons unlocked to Level 100!' });
   if (cmd === 'install') return out(await install());

@@ -1094,3 +1094,150 @@ html:not([lang="en"]) .nav-new { padding: 1px 5px; font-size: 10px; }
 .gauntlet-dlg.minimized .gauntlet-win-controls {
   margin: 0;
 }
+
+/* Template & Generator Bar */
+.gauntlet-template-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 6px;
+  margin-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.gauntlet-template-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gauntlet-btn-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.gauntlet-btn-tool:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.gauntlet-btn-tool:active {
+  transform: translateY(0);
+}
+
+.gauntlet-btn-tool svg {
+  stroke: var(--brass);
+  flex-shrink: 0;
+}
+
+.gauntlet-template-info {
+  display: flex;
+  align-items: center;
+}
+
+.gauntlet-badge-subtle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brass);
+  background: rgba(229, 160, 48, 0.12);
+  border: 1px solid rgba(229, 160, 48, 0.3);
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.2px;
+}
+
+/* Gauntlet Overlays */
+.gauntlet-overlay-panel {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 12, 18, 0.82);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  border-radius: inherit;
+  animation: gFadeIn 0.18s ease-out;
+}
+
+.gauntlet-overlay-panel[hidden] {
+  display: none !important;
+}
+
+@keyframes gFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.gauntlet-overlay-card {
+  width: 100%;
+  max-width: 540px;
+  background: #141b24;
+  border: 1px solid rgba(229, 160, 48, 0.35);
+  border-radius: 8px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.gauntlet-overlay-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 18px 12px;
+  background: #18202b;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gauntlet-overlay-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--brass);
+  letter-spacing: 0.3px;
+}
+
+.gauntlet-overlay-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  max-height: calc(85vh - 120px);
+}
+
+.gauntlet-overlay-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.gauntlet-overlay-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 18px;
+  background: #10161f;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Drag-over indicator on dialog */
+dialog.gauntlet-dlg.drag-over {
+  border-color: var(--brass) !important;
+  box-shadow: 0 0 25px rgba(229, 160, 48, 0.4) !important;
+}

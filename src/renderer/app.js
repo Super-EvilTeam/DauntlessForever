@@ -1037,6 +1037,36 @@ async function openGauntletConfig() {
   let activeRoundIdx = 0;
   const levelCache = (cfg && cfg.levelConfig) ? JSON.parse(JSON.stringify(cfg.levelConfig)) : {};
 
+  function flushActiveLevelToCache() {
+    if (!currentLevelData) return;
+    const lvlNum = Number($('gcfg-level-num').value || 1);
+    const cacheKey = String(lvlNum);
+    levelCache[cacheKey] = {
+      timeLimit: Number($('gcfg-spec-timer').value || (currentLevelData && currentLevelData.timeLimit) || 420),
+      rounds: (currentLevelData && currentLevelData.rounds) ? currentLevelData.rounds.map(r => ({
+        round: r.round,
+        arena: r.arena,
+        behemoths: (r.behemoths || []).slice(),
+        modifiers: (r.modifiers || []).slice()
+      })) : []
+    };
+  }
+
+  function updateTemplatePill(text) {
+    const pill = $('gcfg-template-pill');
+    if (!pill) return;
+    if (text) {
+      pill.textContent = text;
+      pill.style.display = 'inline-block';
+    } else {
+      pill.style.display = 'none';
+    }
+  }
+
+  if (Object.keys(levelCache).length > 1) {
+    updateTemplatePill('Template Active (' + Object.keys(levelCache).length + ' levels)');
+  }
+
   async function loadSpecificLevel() {
     const sVal = $('gcfg-season').value;
     const sNum = sVal === 'all' ? 3 : Number(sVal);
@@ -1067,16 +1097,18 @@ async function openGauntletConfig() {
     status.className = 'action-note';
 
     currentLevelData = inspRes;
+    if (!currentLevelData.rounds) currentLevelData.rounds = [];
     if (levelCache[cacheKey]) {
       const saved = levelCache[cacheKey];
       if (saved.timeLimit) currentLevelData.timeLimit = saved.timeLimit;
       if (Array.isArray(saved.rounds)) {
         saved.rounds.forEach((sr, idx) => {
-          if (currentLevelData.rounds[idx]) {
-            if (sr.arena) currentLevelData.rounds[idx].arena = sr.arena;
-            if (sr.behemoths) currentLevelData.rounds[idx].behemoths = sr.behemoths.slice();
-            if (sr.modifiers) currentLevelData.rounds[idx].modifiers = sr.modifiers.slice();
+          if (!currentLevelData.rounds[idx]) {
+            currentLevelData.rounds[idx] = { round: idx + 1, arena: sr.arena || 'EGauntletArena::Plaza', behemoths: [], modifiers: [] };
           }
+          if (sr.arena) currentLevelData.rounds[idx].arena = sr.arena;
+          if (sr.behemoths) currentLevelData.rounds[idx].behemoths = sr.behemoths.slice();
+          if (sr.modifiers) currentLevelData.rounds[idx].modifiers = sr.modifiers.slice();
         });
       }
     }
@@ -1212,8 +1244,236 @@ async function openGauntletConfig() {
 
   $('gcfg-level-num').onchange = () => {
     if ($('gcfg-levels-scope').value === 'specific') {
+      flushActiveLevelToCache();
       loadSpecificLevel();
     }
+  };
+
+  // ---------------- Random Custom Season Generator ----------------
+  const randPanel = $('gcfg-random-panel');
+  $('gcfg-random-btn').onclick = () => {
+    $('gcfg-rand-season').value = $('gcfg-season').value === 'all' ? '3' : $('gcfg-season').value;
+    const sCur = $('gcfg-rand-season').value;
+    $('gcfg-rand-name').value = 'Random Season ' + sCur;
+    randPanel.hidden = false;
+  };
+  $('gcfg-rand-close').onclick = () => { randPanel.hidden = true; };
+  $('gcfg-rand-cancel').onclick = () => { randPanel.hidden = true; };
+  $('gcfg-rand-confirm').onclick = async () => {
+    const s = $('gcfg-rand-season').value;
+    const lvlCount = Number($('gcfg-rand-levels').value || 20);
+    const density = $('gcfg-rand-density').value;
+    const modIntensity = $('gcfg-rand-mod-intensity').value;
+    const timerMode = $('gcfg-rand-timer').value;
+    const seasonName = ($('gcfg-rand-name').value || '').trim() || ('Random Season ' + s);
+
+    status.textContent = 'Generating random custom season (' + lvlCount + ' levels)...';
+    status.className = 'action-note';
+    $('gcfg-rand-confirm').disabled = true;
+
+    let randRes = null;
+    try {
+      randRes = await L.modsAct(modsVer, 'gauntlet-random-season', s, JSON.stringify({
+        levelCount: lvlCount,
+        density: density,
+        modifierIntensity: modIntensity,
+        timerMode: timerMode
+      }));
+    } catch (e) {
+      randRes = { ok: false, error: String(e && e.message || e) };
+    }
+    $('gcfg-rand-confirm').disabled = false;
+
+    if (!randRes || !randRes.ok || !randRes.levelConfig) {
+      status.textContent = (randRes && randRes.error) || 'Failed to generate random season.';
+      status.className = 'action-note err';
+      return;
+    }
+
+    for (const k of Object.keys(levelCache)) delete levelCache[k];
+    Object.assign(levelCache, randRes.levelConfig);
+
+    $('gcfg-season').value = String(s);
+    renderModifiers(s);
+
+    $('gcfg-levels-scope').value = 'specific';
+    $('gcfg-spec-level-wrap').hidden = false;
+    $('gcfg-global-options').hidden = true;
+    $('gcfg-specific-level-editor').hidden = false;
+    $('gcfg-level-num').value = '1';
+
+    randPanel.hidden = true;
+    updateTemplatePill(seasonName + ' (' + lvlCount + ' lvls)');
+    await loadSpecificLevel();
+
+    status.textContent = 'Generated random season "' + seasonName + '" (' + lvlCount + ' levels)! Tweak any round, export, or click Save & Apply.';
+    status.className = 'action-note';
+  };
+
+  // ---------------- Export Custom Season Template ----------------
+  const expPanel = $('gcfg-export-panel');
+  $('gcfg-export-btn').onclick = () => {
+    flushActiveLevelToCache();
+    const currentSVal = $('gcfg-season').value;
+    const sNum = currentSVal === 'all' ? 3 : Number(currentSVal);
+    const count = Object.keys(levelCache).length;
+    if (count === 0 && currentLevelData) {
+      levelCache['1'] = {
+        timeLimit: Number($('gcfg-spec-timer').value || 420),
+        rounds: (currentLevelData.rounds || []).map(r => ({
+          round: r.round,
+          arena: r.arena,
+          behemoths: (r.behemoths || []).slice(),
+          modifiers: (r.modifiers || []).slice()
+        }))
+      };
+    }
+    const tplName = ($('gcfg-exp-name').value || '').trim() || ('Season ' + sNum + ' Custom Gauntlet');
+    const tplAuthor = ($('gcfg-exp-author').value || '').trim() || 'Slayer';
+    const tplDesc = ($('gcfg-exp-desc').value || '').trim() || ('Custom Gauntlet Season ' + sNum + ' with ' + Object.keys(levelCache).length + ' levels.');
+    const exportData = {
+      format: 'dauntless-forever-gauntlet-template',
+      version: 1,
+      name: tplName,
+      author: tplAuthor,
+      description: tplDesc,
+      createdAt: new Date().toISOString(),
+      season: sNum,
+      levelCount: Object.keys(levelCache).length,
+      levelConfig: levelCache
+    };
+    $('gcfg-exp-preview').value = JSON.stringify(exportData, null, 2);
+    $('gcfg-exp-copy-feedback').style.display = 'none';
+    expPanel.hidden = false;
+  };
+  $('gcfg-exp-close').onclick = () => { expPanel.hidden = true; };
+  $('gcfg-exp-cancel').onclick = () => { expPanel.hidden = true; };
+
+  $('gcfg-exp-copy').onclick = async () => {
+    const text = $('gcfg-exp-preview').value;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        $('gcfg-exp-preview').select();
+        document.execCommand('copy');
+      }
+      $('gcfg-exp-copy-feedback').style.display = 'inline';
+      setTimeout(() => { $('gcfg-exp-copy-feedback').style.display = 'none'; }, 2500);
+    } catch (e) {
+      status.textContent = 'Could not copy to clipboard: ' + (e.message || String(e));
+      status.className = 'action-note err';
+    }
+  };
+
+  $('gcfg-exp-download').onclick = () => {
+    const text = $('gcfg-exp-preview').value;
+    const tplName = ($('gcfg-exp-name').value || 'gauntlet_season').trim();
+    const safeName = tplName.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+    const blob = new Blob([text], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = safeName + '.gauntlet.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    expPanel.hidden = true;
+    status.textContent = 'Exported template to file "' + a.download + '"!';
+    status.className = 'action-note';
+  };
+
+  // ---------------- Import Custom Season Template ----------------
+  function applyImportedTemplate(tpl, sourceName) {
+    let cfgMap = null;
+    let sNum = null;
+    let tplName = sourceName || 'Imported Template';
+
+    if (tpl && typeof tpl === 'object') {
+      if (tpl.levelConfig && typeof tpl.levelConfig === 'object') {
+        cfgMap = tpl.levelConfig;
+        if (tpl.season) sNum = Number(tpl.season);
+        if (tpl.name) tplName = String(tpl.name);
+      } else if (tpl['1'] && typeof tpl['1'] === 'object') {
+        cfgMap = tpl;
+      }
+    }
+
+    if (!cfgMap || Object.keys(cfgMap).length === 0) {
+      status.textContent = 'Invalid template: no levelConfig found in file.';
+      status.className = 'action-note err';
+      return false;
+    }
+
+    for (const k of Object.keys(levelCache)) delete levelCache[k];
+    Object.assign(levelCache, cfgMap);
+
+    if (sNum && sNum >= 1 && sNum <= 5) {
+      $('gcfg-season').value = String(sNum);
+      renderModifiers(String(sNum));
+    }
+
+    const firstLvl = Object.keys(levelCache).map(Number).sort((a, b) => a - b)[0] || 1;
+    $('gcfg-levels-scope').value = 'specific';
+    $('gcfg-spec-level-wrap').hidden = false;
+    $('gcfg-global-options').hidden = true;
+    $('gcfg-specific-level-editor').hidden = false;
+    $('gcfg-level-num').value = String(firstLvl);
+
+    const count = Object.keys(levelCache).length;
+    updateTemplatePill(tplName + ' (' + count + ' lvls)');
+    loadSpecificLevel();
+
+    status.textContent = 'Loaded template "' + tplName + '" (' + count + ' levels)! Tweak any round, export, or click Save & Apply.';
+    status.className = 'action-note';
+    return true;
+  }
+
+  $('gcfg-import-btn').onclick = () => {
+    $('gcfg-import-file').value = '';
+    $('gcfg-import-file').click();
+  };
+
+  $('gcfg-import-file').onchange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        applyImportedTemplate(parsed, file.name.replace(/\.gauntlet\.json$|\.json$/i, ''));
+      } catch (err) {
+        status.textContent = 'Failed to parse JSON file: ' + (err.message || String(err));
+        status.className = 'action-note err';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  dlg.ondragover = (e) => {
+    e.preventDefault();
+    dlg.classList.add('drag-over');
+  };
+  dlg.ondragleave = (e) => {
+    if (e.target === dlg) dlg.classList.remove('drag-over');
+  };
+  dlg.ondrop = (e) => {
+    e.preventDefault();
+    dlg.classList.remove('drag-over');
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        applyImportedTemplate(parsed, file.name.replace(/\.gauntlet\.json$|\.json$/i, ''));
+      } catch (err) {
+        status.textContent = 'Failed to parse dropped JSON file: ' + (err.message || String(err));
+        status.className = 'action-note err';
+      }
+    };
+    reader.readAsText(file);
   };
 
   // Unlock all levels checkbox & quick action
@@ -1328,22 +1588,12 @@ async function openGauntletConfig() {
         unlockAllLevels: unlockAll
       };
     } else {
-      const cacheKey = String(lvlNum);
-      const lvlDataToSave = {
-        timeLimit: Number($('gcfg-spec-timer').value || (currentLevelData && currentLevelData.timeLimit) || 420),
-        rounds: (currentLevelData && currentLevelData.rounds) ? currentLevelData.rounds.map(r => ({
-          round: r.round,
-          arena: r.arena,
-          behemoths: (r.behemoths || []).slice(),
-          modifiers: (r.modifiers || []).slice()
-        })) : []
-      };
-      levelCache[cacheKey] = lvlDataToSave;
-
+      flushActiveLevelToCache();
+      const targetList = Object.keys(levelCache).map(Number).filter(n => !isNaN(n));
       newCfg = {
         season: seasonNum,
         allDualBehemothLevels: false,
-        targetLevels: [lvlNum],
+        targetLevels: targetList.length > 0 ? targetList : [lvlNum],
         levelConfig: levelCache,
         unlockAllLevels: unlockAll
       };
@@ -1377,7 +1627,9 @@ async function openGauntletConfig() {
     }
 
     if (Number.isInteger(seasonNum)) {
-      status.textContent = 'Configuration saved! Season ' + seasonNum + (isAll ? '' : ' Level ' + lvlNum) + ' customized and active' + (unlockAll ? ' (levels 1-100 unlocked).' : '.');
+      const customCount = Object.keys(levelCache).length;
+      const countMsg = (!isAll && customCount > 1) ? (' (' + customCount + ' levels)') : (!isAll ? (' Level ' + lvlNum) : '');
+      status.textContent = 'Configuration saved! Season ' + seasonNum + countMsg + ' customized and active' + (unlockAll ? ' (levels 1-100 unlocked).' : '.');
     } else {
       status.textContent = 'Configuration saved! Custom patch compiled' + (unlockAll ? ' (levels 1-100 unlocked).' : '.');
     }

@@ -251,6 +251,7 @@ flowchart TD
 The launcher communicates with the backend toolchain via asynchronous IPC:
 * `gauntlet-get`: Fetches active season, saved configuration, and available modifiers.
 * `gauntlet-level-get <season> <level>`: Deserializes and returns struct data and species catalogs for a specific level.
+* `gauntlet-random-season <season> <options_json>`: Generates procedural custom season configurations with escalating behemoth density, modifiers, and arenas.
 * `gauntlet-set <base64_json>`: Receives configuration payload, writes `data/gauntlet.json` and `data/gauntlet_season.txt`, runs `gauntlet_patcher.py`, and mounts the resulting `.pak`.
 * `gauntlet-unlock-all`: Unlocks levels 1 to 100 in `data/state.json`.
 
@@ -258,7 +259,75 @@ All inter-process payloads are base64-encoded to guarantee cross-platform string
 
 ---
 
-## 7. Virtual File System (VFS) Packaging & Pak Precedence
+## 7. Random Custom Season Generator & Template Sharing
+
+### 7.1 Procedural Custom Season Generator
+The launcher includes a procedural generator (`generate_random_season`) built into `gauntlet_patcher.py` and exposed through the UI via the **Randomize Season** modal.
+
+* **Target Season (1–5)**: Selects the base encounter spec asset table and validates species/modifier presence against the asset's name table.
+* **Level Count (1–20)**: Generates 5, 10, 15, or up to 20 full levels (clamped to 16 for Seasons 4 and 5).
+* **Density Progression Modes**:
+  * `progressive`: Smoothly scales behemoth density from Solo (early levels 1–3) to Dual (mid levels 4–10) to Trio and 4-Behemoth Brawl (endgame levels 11–20).
+  * `duo`: Focuses purely on Dual-Behemoth encounters across all rounds.
+  * `trio`: Fixed 3-Behemoth encounters for high challenge.
+  * `chaos`: High-density spawns dominated by Trio and 4-Behemoth Brawls.
+  * `varied`: Balanced uniform distribution across Solo, Dual, Trio, and Brawl.
+* **Modifier Intensity Modes**:
+  * `progressive`: Starts clean with occasional minor modifiers early, escalating to 2–3 stacked hunt modifiers in endgame rounds.
+  * `chaos`: 1 to 3 active modifiers on every single round.
+  * `mild`: Light modifier distribution (0–1 per round).
+  * `vanilla`: Zero extra hunt modifiers (pure behemoth combat).
+* **Timer Presets**: Default (07:00), Speedrun (03:00), Fast (05:00), Endurance (10:00), Marathon (15:00), or custom seconds.
+
+### 7.2 Interactive Level Tweaking
+Once generated, the full season populates the launcher's `levelCache`. The user can:
+1. Navigate between levels (1 through 20) and rounds (1 through 5).
+2. Override any arena (`Plaza`, `Forge`, `Hangar`).
+3. Add, remove, or swap behemoth species from the 50+ available species catalog.
+4. Toggle active hunt modifiers per round.
+5. Save and apply directly to compile into the active game pak, or export the tweaked template.
+
+### 7.3 Custom Season Template Schema (`.gauntlet.json`)
+Custom seasons can be exported to share with other players or imported into any Dauntless Forever client.
+
+```json
+{
+  "format": "dauntless-forever-gauntlet-template",
+  "version": 1,
+  "name": "Custom Chaos Season 3",
+  "author": "Slayer",
+  "description": "20 custom levels with escalating behemoth spawns and modifiers.",
+  "createdAt": "2026-11-13T21:00:00.000Z",
+  "season": 3,
+  "levelCount": 20,
+  "levelConfig": {
+    "1": {
+      "timeLimit": 420.0,
+      "rounds": [
+        {
+          "round": 1,
+          "arena": "EGauntletArena::Plaza",
+          "behemoths": ["bugbear_normal"],
+          "modifiers": []
+        },
+        {
+          "round": 5,
+          "arena": "EGauntletArena::Hangar",
+          "behemoths": ["salt_normal"],
+          "modifiers": ["HM_PUSHANDPULL"]
+        }
+      ]
+    }
+  }
+}
+```
+
+* **Export**: Users can copy the formatted JSON directly to their clipboard or download a `<template_name>.gauntlet.json` file.
+* **Import**: Users can click **Import Template** to select a `.gauntlet.json` file, or simply drag and drop the `.json` file anywhere onto the Gauntlet Customizer dialog window. The template is validated, loaded into `levelCache`, and the editor switches to Level 1 ready for playing or further tweaking.
+
+---
+
+## 8. Virtual File System (VFS) Packaging & Pak Precedence
 
 Patched encounter assets are compiled into an Unreal Engine package file using `repak`:
 
@@ -271,12 +340,12 @@ writer = builder.writer(
 )
 ```
 
-### 7.1 Mount Point Relative Addressing (`../../../`)
+### 8.1 Mount Point Relative Addressing (`../../../`)
 * Game binary location: `<GameRoot>/Archon/Binaries/Win64/Dauntless-Win64-Shipping.exe`
 * Engine content root: `<GameRoot>/Archon/Content/`
 * Specifying a mount point of `../../../` aligns the pak archive root directly with `<GameRoot>/`. Paths inside the pak (e.g., `Archon/Content/gamemodes/escalation/base_blueprints/gauntlet_mode_encounter_specs.uasset`) map directly over the base game assets in VFS.
 
-### 7.2 Lexicographical Precedence
+### 8.2 Lexicographical Precedence
 Unreal Engine loads patch paks (`*_P.pak`) in strict alphabetical order:
 1. Paks ending in `_P.pak` supersede non-patch paks.
 2. By prefixing the pak filename with `zzzzzzzzzzzzzzzz_`, the custom pak mounts last in the VFS queue, overriding vanilla encounter tables with 100% authority.
@@ -284,18 +353,20 @@ Unreal Engine loads patch paks (`*_P.pak`) in strict alphabetical order:
 
 ---
 
-## 8. Summary Specification Table
+## 9. Summary Specification Table
 
 | System Component | Technology / Mechanism | Implementation Details |
 | :--- | :--- | :--- |
 | **Encounter Orchestration** | Unreal Engine C++ / GMC | `gauntlet_encounter_gmc` spawns actors per `Content` entry at `BP_PatrolCenterPoint` [0..3] |
-| **Season Selection** | Metagame Server (`modes1147.js`) | Reads active season from `data/gauntlet_season.txt`; switches encounter table between S1–S5 |
-| **Board Progression** | Local State JSON (`state.json`) | Unlocks levels 1–100 across seasons in `mega1147.gauntlet1147` |
+| **Season Selection** | Metagame Server (`modes1147.js`) | Reads active season from `data/gauntlet_season.txt`; switches encounter table between S1-S5 |
+| **Board Progression** | Local State JSON (`state.json`) | Unlocks levels 1-100 across seasons in `mega1147.gauntlet1147` |
 | **Binary Formats** | Cooked UE 4.26/4.27 UAsset & UExp | Tagged properties; 230-byte Behemoth structs and 214-byte Modifier structs |
 | **Binary Patcher** | Python (`gauntlet_patcher.py`) | Inspects structs; applies in-place edits, expansions (up to 4), and shrink deletions |
 | **Offset Synchronization** | Cascading Size Recalculation | 7-point updates across Tag Size, Array Count, Struct Inner Size, Export SerialSize, and Bulk Offset |
 | **Patch Sequencing** | Reverse-Order Execution | Operations applied in descending order of file offset (`reverse=True`) to maintain offset invariance |
+| **Random Season Generator** | Procedural Generation Engine | Generates full custom seasons with progressive behemoth density, modifiers, and arenas |
+| **Template Sharing System** | JSON Template Schema (`.gauntlet.json`) | Shareable custom season templates with file download, clipboard copy, and drag-and-drop import |
 | **VFS Packaging** | `repak` (Version V3) | `zzzzzzzzzzzzzzzz_GauntletThreeBehemoths_P.pak` mounted at `../../../` for top override priority |
-| **IPC Bridge** | Node.js (`ue4ss.cjs` / `main.js`) | Actions `gauntlet-get`, `gauntlet-set`, `gauntlet-level-get`, `gauntlet-unlock-all` via Base64 JSON |
-| **Launcher Interface** | HTML5 / CSS3 / Vanilla JS | Dual-mode modal: Global Dual-Round tuning vs. Specific Level 5-Round struct customizer |
+| **IPC Bridge** | Node.js (`ue4ss.cjs` / `main.js`) | Actions `gauntlet-get`, `gauntlet-set`, `gauntlet-level-get`, `gauntlet-random-season`, `gauntlet-unlock-all` via Base64 JSON |
+| **Launcher Interface** | HTML5 / CSS3 / Vanilla JS | Dual-mode modal: Global Dual-Round tuning vs. Specific Level 5-Round struct customizer with template toolbar |
 | **Encoding Integrity** | 7-bit ASCII Check (`check-ascii.js`) | All launcher code, templates, and scripts strictly verified for clean ASCII compliance |
