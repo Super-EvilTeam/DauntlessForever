@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gauntlet Customizer - Dauntless 1.14.7</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-group">
+        <div class="logo-icon">&#9876;</div>
+        <div>
+          <h1>Gauntlet Customizer</h1>
+          <p class="subtitle">Dauntless 1.14.7 Standalone UE4SS Mod</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btn-random-season" class="btn btn-secondary">&#127922; Randomize Season</button>
+        <button id="btn-save-apply" class="btn btn-primary">&#128190; Save & Apply</button>
+      </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="main-content">
+      <!-- Top Bar: Season & Mode Selection -->
+      <section class="card config-card">
+        <div class="config-row">
+          <div class="form-group">
+            <label for="sel-season">Active Season</label>
+            <select id="sel-season" class="form-control">
+              <option value="1">Season 1: Frostfall</option>
+              <option value="2">Season 2: Ardent Flames</option>
+              <option value="3" selected>Season 3: Paradox Breaks</option>
+              <option value="4">Season 4: Clear Skies</option>
+              <option value="5">Season 5: Return to the Void</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Mode Selection</label>
+            <div class="segmented-control">
+              <button id="mode-global-btn" class="seg-btn active" data-mode="global">All Dual-Behemoth Levels</button>
+              <button id="mode-spec-btn" class="seg-btn" data-mode="specific">Specific Level (1–1000)</button>
+            </div>
+          </div>
+
+          <div class="form-group toggle-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="chk-unlock-all" checked>
+              <span>Unlock Levels 1–1000 on Hunt Board</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Global Dual-Behemoth Mode Panel -->
+      <section id="panel-global" class="card">
+        <div class="card-header">
+          <h2>Global Dual-Behemoth Encounters</h2>
+          <span class="badge">Macro Tuning</span>
+        </div>
+        <p class="section-desc">Apply tuning across all dual-behemoth encounters in the selected season.</p>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Behemoths Per Round</label>
+            <div class="pills-control" id="global-behemoth-pills">
+              <button class="pill" data-count="1">1 Solo</button>
+              <button class="pill" data-count="2">2 Dual</button>
+              <button class="pill active" data-count="3">3 Trio (Mod)</button>
+              <button class="pill" data-count="4">4 Brawl</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="sel-global-timer">Match Timer Override</label>
+            <select id="sel-global-timer" class="form-control">
+              <option value="0" selected>Unchanged (07:00 Default)</option>
+              <option value="180">03:00 (Blitz)</option>
+              <option value="300">05:00 (Challenging)</option>
+              <option value="600">10:00 (Generous)</option>
+              <option value="900">15:00 (Marathon)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modifiers-section">
+          <label>Stacked Hunt Modifiers</label>
+          <div class="modifiers-grid" id="global-modifiers-grid">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Specific Level Mode Panel -->
+      <section id="panel-specific" class="card" style="display: none;">
+        <div class="card-header">
+          <div class="level-nav">
+            <button id="btn-prev-lvl" class="nav-arrow-btn" title="Previous Level">&lt;</button>
+            <div class="level-display">
+              <span class="lvl-label">Level</span>
+              <input type="number" id="inp-level-num" min="1" max="1000" value="5" class="level-num-input">
+              <span class="lvl-max">/ 1000</span>
+            </div>
+            <button id="btn-next-lvl" class="nav-arrow-btn" title="Next Level">&gt;</button>
+          </div>
+
+          <div class="level-meta-group">
+            <div class="form-group inline-group">
+              <label for="sel-spec-timer">Match Timer:</label>
+              <select id="sel-spec-timer" class="form-control inline-select">
+                <option value="0">Unchanged (07:00)</option>
+                <option value="180">03:00</option>
+                <option value="300">05:00</option>
+                <option value="420" selected>07:00</option>
+                <option value="600">10:00</option>
+                <option value="900">15:00</option>
+              </select>
+            </div>
+
+            <div class="form-group inline-group">
+              <label for="inp-behemoth-lvl">Behemoth Level (1–100):</label>
+              <input type="number" id="inp-behemoth-lvl" min="1" max="100" value="18" class="form-control inline-number">
+            </div>
+          </div>
+        </div>
+
+        <!-- 5 Round Tabs -->
+        <div class="round-tabs" id="round-tabs">
+          <button class="round-tab active" data-round="0">Round 1</button>
+          <button class="round-tab" data-round="1">Round 2</button>
+          <button class="round-tab" data-round="2">Round 3</button>
+          <button class="round-tab" data-round="3">Round 4</button>
+          <button class="round-tab" data-round="4">Round 5</button>
+        </div>
+
+        <!-- Active Round Editor -->
+        <div class="round-editor">
+          <div class="round-top-row">
+            <div class="form-group">
+              <label for="sel-round-arena">Round Arena Layout</label>
+              <select id="sel-round-arena" class="form-control">
+                <option value="Plaza">Plaza (Central Ruins)</option>
+                <option value="Forge">Forge (Molten Core)</option>
+                <option value="Hangar">Hangar (Aetheric Platforms)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Behemoths in this Round</label>
+              <div class="pills-control" id="round-behemoth-pills">
+                <button class="pill" data-count="1">1</button>
+                <button class="pill active" data-count="2">2</button>
+                <button class="pill" data-count="3">3</button>
+                <button class="pill" data-count="4">4</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Behemoth Slot Dropdowns -->
+          <div class="behemoth-slots-container">
+            <label>Behemoth Composition</label>
+            <div class="behemoth-slots-grid" id="behemoth-slots-grid">
+              <!-- Dynamically populated 1-4 slots -->
+            </div>
+          </div>
+
+          <!-- Round Modifiers -->
+          <div class="modifiers-section">
+            <label>Round Modifiers</label>
+            <div class="modifiers-grid" id="round-modifiers-grid">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Feedback Toast -->
+    <div id="toast" class="toast" style="display: none;"></div>
+
+    <!-- Random Season Modal -->
+    <div id="modal-random" class="modal-overlay" style="display: none;">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3>Procedural Custom Season Generator</h3>
+          <button id="btn-close-modal" class="btn-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-intro">Generate a complete custom season with bespoke themes, boss milestones, and scaling difficulty.</p>
+
+          <div class="modal-form-grid">
+            <div class="form-group">
+              <label for="rnd-theme">Elemental Theme</label>
+              <select id="rnd-theme" class="form-control">
+                <option value="all">Balanced (All Elements & Species)</option>
+                <option value="frost">Frostfall (Frostwulf, Pangar, Boreus, Urska)</option>
+                <option value="blaze">Inferno (Charrogg, Hellion, Embermane, Torgadoro, Phaelanx)</option>
+                <option value="shock">Shock Surge (Nayzaga, Stormclaw, Drask, Malkarion)</option>
+                <option value="terra">Terra Dominion (Skarn, Kharabak, Koshai, Agarus, Fenroar)</option>
+                <option value="umbral">Umbral Void (Shrowd, Riftstalker, Thrax, Bloodshot Shrowd)</option>
+                <option value="radiant">Radiant Dawn (Rezakiri, Valomyr, Chronovore, Alyra)</option>
+                <option value="keystones">Keystone Boss Rush (Escalation Bosses Only)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="rnd-levels">Level Count</label>
+              <select id="rnd-levels" class="form-control">
+                <option value="5">5 Levels (Quick Rush)</option>
+                <option value="10">10 Levels (Standard Mini-Season)</option>
+                <option value="20" selected>20 Levels (Classic Full Season)</option>
+                <option value="50">50 Levels (Extended Campaign)</option>
+                <option value="100">100 Levels (Centurion Gauntlet)</option>
+                <option value="200">200 Levels (Double Century)</option>
+                <option value="500">500 Levels (Epic Marathon)</option>
+                <option value="1000">1000 Levels (Millennium / Hard Engine Cap)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="rnd-bosses">Milestone Boss Levels</label>
+              <select id="rnd-bosses" class="form-control">
+                <option value="every5">Every 5 Levels (Mini-Bosses & Keystones)</option>
+                <option value="every10" selected>Every 10 Levels (Decennial Keystones)</option>
+                <option value="none">None (Smooth Scaling)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="rnd-density">Density Progression</label>
+              <select id="rnd-density" class="form-control">
+                <option value="progressive" selected>Progressive (Solo &rarr; Dual &rarr; Trio &rarr; Brawl)</option>
+                <option value="duo">Duo Focus (Pure Dual Behemoths)</option>
+                <option value="intense">Intense (Trios & 4-Behemoth Brawls)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="rnd-scaling">Behemoth Level Scaling</label>
+              <select id="rnd-scaling" class="form-control">
+                <option value="progressive" selected>Progressive Curve (L10 &rarr; L30+)</option>
+                <option value="escalating">Escalating (+1 Level Every 5 Levels)</option>
+                <option value="fixed20">Fixed Heroic (All Level 20)</option>
+                <option value="fixed30">Fixed Nightmare (All Level 30)</option>
+                <option value="fixed50">Fixed Mythic (All Level 50)</option>
+                <option value="fixed100">Fixed God Slayer (All Level 100)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-cancel-modal" class="btn btn-secondary">Cancel</button>
+          <button id="btn-generate-modal" class="btn btn-primary">&#10024; Generate & Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

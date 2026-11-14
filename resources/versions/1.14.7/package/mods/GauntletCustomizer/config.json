@@ -1,0 +1,13 @@
+{
+  "season": 3,
+  "allDualBehemothLevels": true,
+  "targetLevels": [5],
+  "behemothCount": 3,
+  "timeLimitSeconds": 0,
+  "modifiers": [
+    "HM_PUSHANDPULL",
+    "HM_ELECTRIFY"
+  ],
+  "replaceExistingModifiers": true,
+  "unlockAllLevels": true
+}
