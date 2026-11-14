@@ -10,11 +10,11 @@
                      },
                      {
                          "id":  "1.14.7",
-                         "packageVersion":  "2026-11-13",
-                         "url":  "https://github.com/addison2k/DauntlessForever/releases/download/packages/1.14.7-2026-11-13.zip",
-                         "sha256":  "424d6febc89210bbb6ebad4d0770148b68aabbf0899c3c288a21f85cf4a3fdac",
-                         "date":  "2026-11-13",
-                         "note":  "Crit numbers now have settings in the game: Options \u003e Gameplay has 7 new rows (style, size, tilt, hang time and more). Comic crit numbers are OFF until you turn on Crit Numbers there."
+                         "packageVersion":  "2026-11-14",
+                         "url":  "https://github.com/addison2k/DauntlessForever/releases/download/packages/1.14.7-2026-11-14.zip",
+                         "sha256":  "b2939d2d5ae26f0f42a27bf96d1ec05471d9c11312952e5078283335fe78df99",
+                         "date":  "2026-11-14",
+                         "note":  "Forged in Fury: Collect 5 Discoveries on the Blazeworks now counts every discovery. If you were stuck at 1 of 5, just start the game: the quest shows what you found and can be turned in"
                      }
                  ],
     "launcher":  {
