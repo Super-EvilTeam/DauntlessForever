@@ -1041,8 +1041,11 @@ async function openGauntletConfig() {
     if (!currentLevelData) return;
     const lvlNum = Number($('gcfg-level-num').value || 1);
     const cacheKey = String(lvlNum);
+    const bLvlInput = $('gcfg-spec-behemoth-lvl');
+    const bLvl = bLvlInput ? Math.max(1, Math.min(100, Number(bLvlInput.value) || 10)) : Math.min(100, (currentLevelData && currentLevelData.behemothLevel) || 10);
     levelCache[cacheKey] = {
       timeLimit: Number($('gcfg-spec-timer').value || (currentLevelData && currentLevelData.timeLimit) || 420),
+      behemothLevel: bLvl,
       rounds: (currentLevelData && currentLevelData.rounds) ? currentLevelData.rounds.map(r => ({
         round: r.round,
         arena: r.arena,
@@ -1070,7 +1073,7 @@ async function openGauntletConfig() {
   async function loadSpecificLevel() {
     const sVal = $('gcfg-season').value;
     const sNum = sVal === 'all' ? 3 : Number(sVal);
-    const maxLvl = (sNum >= 4) ? 16 : 20;
+    const maxLvl = 1000;
     let lvlNum = Number($('gcfg-level-num').value || 1);
     if (isNaN(lvlNum) || lvlNum < 1) lvlNum = 1;
     if (lvlNum > maxLvl) lvlNum = maxLvl;
@@ -1101,6 +1104,7 @@ async function openGauntletConfig() {
     if (levelCache[cacheKey]) {
       const saved = levelCache[cacheKey];
       if (saved.timeLimit) currentLevelData.timeLimit = saved.timeLimit;
+      if (saved.behemothLevel != null) currentLevelData.behemothLevel = saved.behemothLevel;
       if (Array.isArray(saved.rounds)) {
         saved.rounds.forEach((sr, idx) => {
           if (!currentLevelData.rounds[idx]) {
@@ -1130,6 +1134,17 @@ async function openGauntletConfig() {
     timerSel.onchange = () => {
       if (currentLevelData) currentLevelData.timeLimit = Number(timerSel.value);
     };
+
+    const bLvlInput = $('gcfg-spec-behemoth-lvl');
+    if (bLvlInput) {
+      const activeBLvl = Math.max(1, Math.min(100, (levelCache[cacheKey] && levelCache[cacheKey].behemothLevel != null)
+        ? levelCache[cacheKey].behemothLevel
+        : ((currentLevelData && currentLevelData.behemothLevel != null) ? currentLevelData.behemothLevel : 10)));
+      bLvlInput.value = activeBLvl;
+      bLvlInput.oninput = () => {
+        if (currentLevelData) currentLevelData.behemothLevel = Math.max(1, Math.min(100, Number(bLvlInput.value) || 10));
+      };
+    }
 
     renderRoundTabs();
     renderActiveRound();
@@ -1249,9 +1264,49 @@ async function openGauntletConfig() {
     }
   };
 
+  if ($('gcfg-prev-lvl-btn')) {
+    $('gcfg-prev-lvl-btn').onclick = () => {
+      let cur = Number($('gcfg-level-num').value || 1);
+      if (cur > 1) {
+        flushActiveLevelToCache();
+        $('gcfg-level-num').value = cur - 1;
+        loadSpecificLevel();
+      }
+    };
+  }
+  if ($('gcfg-next-lvl-btn')) {
+    $('gcfg-next-lvl-btn').onclick = () => {
+      let cur = Number($('gcfg-level-num').value || 1);
+      if (cur < 1000) {
+        flushActiveLevelToCache();
+        $('gcfg-level-num').value = cur + 1;
+        loadSpecificLevel();
+      }
+    };
+  }
+
   // ---------------- Random Custom Season Generator ----------------
   const randPanel = $('gcfg-random-panel');
   const randErr = $('gcfg-rand-err');
+  if ($('gcfg-rand-levels')) {
+    $('gcfg-rand-levels').onchange = () => {
+      const isCustom = $('gcfg-rand-levels').value === 'custom';
+      if ($('gcfg-rand-custom-levels')) {
+        $('gcfg-rand-custom-levels').style.display = isCustom ? 'inline-block' : 'none';
+        if (isCustom) $('gcfg-rand-custom-levels').focus();
+      }
+    };
+  }
+  if ($('gcfg-rand-behemoth-lvl')) {
+    $('gcfg-rand-behemoth-lvl').onchange = () => {
+      const isCustom = $('gcfg-rand-behemoth-lvl').value === 'custom';
+      if ($('gcfg-rand-custom-b-lvl')) {
+        $('gcfg-rand-custom-b-lvl').style.display = isCustom ? 'inline-block' : 'none';
+        if (isCustom) $('gcfg-rand-custom-b-lvl').focus();
+      }
+    };
+  }
+
   $('gcfg-random-btn').onclick = () => {
     $('gcfg-rand-season').value = $('gcfg-season').value === 'all' ? '3' : $('gcfg-season').value;
     const sCur = $('gcfg-rand-season').value;
@@ -1264,10 +1319,19 @@ async function openGauntletConfig() {
   $('gcfg-rand-confirm').onclick = async () => {
     if (randErr) { randErr.textContent = ''; randErr.style.display = 'none'; }
     const s = $('gcfg-rand-season').value;
-    const lvlCount = Number($('gcfg-rand-levels').value || 20);
+    let lvlCount = 20;
+    if ($('gcfg-rand-levels') && $('gcfg-rand-levels').value === 'custom') {
+      lvlCount = Math.max(1, Math.min(1000, Number($('gcfg-rand-custom-levels').value || 25)));
+    } else if ($('gcfg-rand-levels')) {
+      lvlCount = Math.max(1, Math.min(1000, Number($('gcfg-rand-levels').value || 20)));
+    }
+    const theme = ($('gcfg-rand-theme') && $('gcfg-rand-theme').value) || 'all';
     const density = $('gcfg-rand-density').value;
     const modIntensity = $('gcfg-rand-mod-intensity').value;
+    const bossMilestones = ($('gcfg-rand-milestones') && $('gcfg-rand-milestones').value) || 'every5';
     const timerMode = $('gcfg-rand-timer').value;
+    const bLvlProg = ($('gcfg-rand-behemoth-lvl') && $('gcfg-rand-behemoth-lvl').value) || 'progressive';
+    const customBLvl = Math.max(1, Math.min(100, ($('gcfg-rand-custom-b-lvl') && Number($('gcfg-rand-custom-b-lvl').value)) || 10));
     const seasonName = ($('gcfg-rand-name').value || '').trim() || ('Random Season ' + s);
 
     status.textContent = 'Generating random custom season (' + lvlCount + ' levels)...';
@@ -1278,9 +1342,13 @@ async function openGauntletConfig() {
     try {
       randRes = await L.modsAct(modsVer, 'gauntlet-random-season', s, JSON.stringify({
         levelCount: lvlCount,
+        theme: theme,
         density: density,
         modifierIntensity: modIntensity,
-        timerMode: timerMode
+        bossMilestones: bossMilestones,
+        timerMode: timerMode,
+        behemothLevelProgression: bLvlProg,
+        customBehemothLevel: customBLvl
       }));
     } catch (e) {
       randRes = { ok: false, error: String(e && e.message || e) };
@@ -1326,8 +1394,11 @@ async function openGauntletConfig() {
     const sNum = currentSVal === 'all' ? 3 : Number(currentSVal);
     const count = Object.keys(levelCache).length;
     if (count === 0 && currentLevelData) {
+      const bLvlInput = $('gcfg-spec-behemoth-lvl');
+      const bLvl = bLvlInput ? Math.max(1, Math.min(100, Number(bLvlInput.value) || 10)) : Math.min(100, (currentLevelData && currentLevelData.behemothLevel) || 10);
       levelCache['1'] = {
         timeLimit: Number($('gcfg-spec-timer').value || 420),
+        behemothLevel: bLvl,
         rounds: (currentLevelData.rounds || []).map(r => ({
           round: r.round,
           arena: r.arena,
@@ -1573,7 +1644,7 @@ async function openGauntletConfig() {
   // Save
   $('gcfg-save').onclick = async () => {
     const isAll = $('gcfg-levels-scope').value === 'all';
-    const lvlNum = Math.max(1, Math.min(20, Number($('gcfg-level-num').value || 1)));
+    const lvlNum = Math.max(1, Math.min(1000, Number($('gcfg-level-num').value || 1)));
     const unlockAll = $('gcfg-unlock-all').checked;
     const seasonVal = $('gcfg-season').value;
     const seasonNum = seasonVal === 'all' ? 'all' : Number(seasonVal);

@@ -104,6 +104,60 @@ BEHEMOTH_NAMES = {
     'wolf_heroic': 'Heroic Frostwulf',
 }
 
+KEYSTONE_BEHEMOTHS = [
+    'armstrong_normal', 'armstrong_heroic',
+    'thunderbird_normal', 'thunderbird_heroic',
+    'randall_normal', 'randall_heroic',
+    'funguy_normal', 'funguy_heroic',
+    'mint_normal', 'mint_heroic',
+    'glitter_normal', 'glitter_heroic',
+    'crowbear_alpha', 'habanero_normal'
+]
+
+THEME_BEHEMOTHS = {
+    'frost': [
+        'host_normal', 'host_alpha', 'host_heroic', 'mcrollin_normal', 'mcrollin_alpha',
+        'mcrollin_heroic', 'snowflake_normal', 'snowflake_alpha', 'snowflake_heroic',
+        'wolf_normal', 'wolf_heroic', 'mint_normal', 'mint_heroic', 'beaver_frost', 'rock_frost'
+    ],
+    'blaze': [
+        'sally_normal', 'sally_alpha', 'sally_heroic', 'lerawr_normal', 'lerawr_alpha',
+        'lerawr_heroic', 'lavaroller_normal', 'lavaroller_alpha', 'lavaroller_heroic',
+        'armstrong_normal', 'armstrong_heroic', 'beaver_blaze', 'bugbear_blaze', 'bullseye_blaze',
+        'habanero_normal', 'habanero_heroic'
+    ],
+    'shock': [
+        'fulgar_normal', 'fulgar_alpha', 'fulgar_heroic', 'electroquill_normal', 'electroquill_alpha',
+        'electroquill_heroic', 'shockmane_normal', 'shockmane_alpha', 'shockmane_heroic',
+        'mantis_normal', 'mantis_heroic', 'thunderbird_normal', 'thunderbird_heroic'
+    ],
+    'terra': [
+        'beaver_normal', 'beaver_alpha', 'beaver_heroic', 'rock_normal', 'rock_alpha',
+        'rock_heroic', 'scissors_normal', 'scissors_alpha', 'scissors_heroic',
+        'paper_normal', 'paper_heroic', 'terramane_normal', 'terramane_alpha', 'terramane_heroic',
+        'funguy_normal', 'funguy_heroic', 'bullseye_normal', 'bullseye_alpha'
+    ],
+    'umbral': [
+        'crowbear_normal', 'crowbear_alpha', 'crowbear_heroic', 'shadowcat_normal', 'shadowcat_heroic',
+        'paper_umbral', 'electroquill_umbral', 'fulgar_umbral', 'randall_normal', 'randall_heroic'
+    ],
+    'radiant': [
+        'salt_normal', 'salt_heroic', 'bugbear_normal', 'glitter_normal', 'glitter_heroic',
+        'amber_normal', 'amber_heroic', 'paper_radiant', 'host_radiant'
+    ],
+    'keystones': KEYSTONE_BEHEMOTHS
+}
+
+THEME_MODIFIERS = {
+    'frost': ['HM_ENVIRONMENT_DEEPFREEZE', 'HM_DRAIN_REVIVE', 'HM_STAMINA_DRAIN', 'HM_SLAYER_SPEED_REDUCED'],
+    'blaze': ['HM_COMBUSTION', 'HM_SPEED_UP', 'HM_EXPLOSIVE_EXPLOSIONS'],
+    'shock': ['HM_ELECTRIFY', 'HM_SPEED_UP'],
+    'terra': ['HM_ARMOR_PLATES', 'HM_CRIT_WOUNDED', 'HM_REFLECT_DAMAGE'],
+    'umbral': ['HM_PUSHANDPULL', 'HM_STAMINA_DRAIN', 'HM_DRAIN_REVIVE'],
+    'radiant': ['HM_ELECTRIFY', 'HM_FAST_ATTACKS', 'HM_SPEED_UP'],
+    'keystones': ['HM_PUSHANDPULL', 'HM_ELECTRIFY', 'HM_COMBUSTION', 'HM_ARMOR_PLATES', 'HM_SPEED_UP']
+}
+
 DEFAULT_CONFIG = {
     "enabled": True,
     "season": 3,
@@ -192,13 +246,28 @@ def inspect_level(season_num, level_num):
         return {'ok': False, 'error': 'GAUNTLET_S1_LEVEL not found in asset names.'}
     l_idx = names.index('GAUNTLET_S1_LEVEL')
     
-    pos = b_data.find(struct.pack('<II', l_idx, int(level_num) + 1))
+    lvl_num = int(level_num) if str(level_num).isdigit() else 1
+    base_rows = struct.unpack_from('<I', b_data, 67)[0]
+    target_lvl = lvl_num if (1 <= lvl_num <= base_rows) else (((lvl_num - 1) % base_rows) + 1)
+    pos = -1
+    o_cur = 71
+    for r_idx in range(base_rows):
+        cur_lvl = r_idx + 1
+        if cur_lvl == target_lvl:
+            pos = o_cur
+            break
+        rname, o_cur = r_name(b_data, o_cur, names)
+        while o_cur < len(b_data):
+            tag, o_cur = parse_tag(b_data, o_cur, names)
+            if tag['name'] == 'None':
+                break
     if pos == -1:
         return {'ok': False, 'error': f'Level {level_num} not found in Season {s_idx}.'}
         
     o = pos + 8
     time_limit = 420.0
     rounds = []
+    behemoth_levels = []
     
     while o < len(b_data):
         tag, o = parse_tag(b_data, o, names)
@@ -230,6 +299,7 @@ def inspect_level(season_num, level_num):
                             is_m = False
                             bn = None
                             mn = None
+                            blvl = None
                             while co < len(craw):
                                 ctag, co = parse_tag(craw, co, names)
                                 if ctag['name'] == 'None': break
@@ -241,6 +311,8 @@ def inspect_level(season_num, level_num):
                                 elif ctag['name'] == 'BehemothName':
                                     i, _ = struct.unpack_from('<II', ctag['raw'], 0)
                                     if i < len(names): bn = names[i]
+                                elif ctag['name'] == 'BehemothLevel':
+                                    blvl = struct.unpack_from('<i', ctag['raw'], 0)[0]
                                 elif ctag['name'] == 'Modifier':
                                     mraw = ctag['raw']
                                     mo = 0
@@ -253,6 +325,8 @@ def inspect_level(season_num, level_num):
                                         if mtag['name'] == 'None': break
                             if is_b and bn:
                                 behemoths.append(bn)
+                                if blvl is not None:
+                                    behemoth_levels.append(blvl)
                             if is_m and mn:
                                 modifiers.append(mn)
                 rounds.append({
@@ -262,6 +336,18 @@ def inspect_level(season_num, level_num):
                     'modifiers': modifiers
                 })
                 
+    avg_b_lvl = int(round(sum(behemoth_levels) / len(behemoth_levels))) if behemoth_levels else 10
+    try:
+        cfg = load_config()
+        lvl_cfg = cfg.get('levelConfig', {}).get(str(lvl_num))
+        if lvl_cfg:
+            if 'timeLimit' in lvl_cfg and float(lvl_cfg['timeLimit']) > 0:
+                time_limit = float(lvl_cfg['timeLimit'])
+            if 'behemothLevel' in lvl_cfg and int(lvl_cfg['behemothLevel']) > 0:
+                avg_b_lvl = int(lvl_cfg['behemothLevel'])
+    except Exception:
+        pass
+        
     avail_behemoths = []
     for bn, display in BEHEMOTH_NAMES.items():
         if bn in names:
@@ -275,8 +361,9 @@ def inspect_level(season_num, level_num):
     return {
         'ok': True,
         'season': s_idx,
-        'level': int(level_num),
+        'level': lvl_num,
         'timeLimit': time_limit,
+        'behemothLevel': avg_b_lvl,
         'rounds': rounds,
         'catalog': {
             'arenas': [
@@ -314,17 +401,24 @@ def generate_random_season(season_num=3, options=None):
     s_idx = int(season_num) if str(season_num).isdigit() else 3
     if s_idx < 1 or s_idx > 5:
         s_idx = 3
-    max_lvls = 16 if s_idx >= 4 else 20
-    
-    req_lvls = options.get('levelCount', max_lvls)
-    try:
-        level_count = max(1, min(int(req_lvls), max_lvls))
-    except Exception:
-        level_count = max_lvls
         
+    req_lvls = options.get('levelCount', 20)
+    try:
+        level_count = max(1, min(int(req_lvls), 1000))
+    except Exception:
+        level_count = 20
+        
+    theme = str(options.get('theme', 'all')).lower()
     density = str(options.get('density', 'progressive')).lower()
     modifier_intensity = str(options.get('modifierIntensity', 'progressive')).lower()
+    boss_milestones = str(options.get('bossMilestones', 'every5')).lower()
     timer_mode = str(options.get('timerMode', 'default')).lower()
+    b_lvl_mode = str(options.get('behemothLevelProgression', 'progressive')).lower()
+    custom_b_lvl = 10
+    try:
+        custom_b_lvl = max(1, min(100, int(options.get('customBehemothLevel', 10))))
+    except Exception:
+        custom_b_lvl = 10
     
     spec_name = spec_map[s_idx]
     uasset_path = BASE_ASSETS_DIR / f'{spec_name}.uasset'
@@ -336,6 +430,16 @@ def generate_random_season(season_num=3, options=None):
     if not avail_behemoths:
         avail_behemoths = [n for n in names if ('_normal' in n or '_alpha' in n or '_heroic' in n) and n != 'None']
     avail_modifiers = [n for n in names if n.startswith('HM_') and n != 'HM_TEST_SELF_REVIVE']
+    
+    theme_behemoths = []
+    if theme in THEME_BEHEMOTHS:
+        theme_behemoths = [bn for bn in THEME_BEHEMOTHS[theme] if bn in names]
+        
+    theme_modifiers = []
+    if theme in THEME_MODIFIERS:
+        theme_modifiers = [mn for mn in THEME_MODIFIERS[theme] if mn in names]
+        
+    keystone_pool = [bn for bn in KEYSTONE_BEHEMOTHS if bn in names]
     
     arenas = ['EGauntletArena::Plaza', 'EGauntletArena::Forge', 'EGauntletArena::Hangar']
     
@@ -359,9 +463,16 @@ def generate_random_season(season_num=3, options=None):
     level_cfg = {}
     for lvl in range(1, level_count + 1):
         rounds = []
+        is_boss_level = False
+        if boss_milestones == 'every5' and (lvl % 5 == 0):
+            is_boss_level = True
+        elif boss_milestones == 'every10' and (lvl % 10 == 0):
+            is_boss_level = True
+            
         for rnd in range(1, 6):
             arena = random.choice(arenas)
             
+            # Determine behemoth count
             if density == 'solo':
                 b_count = 1
             elif density == 'duo':
@@ -372,21 +483,44 @@ def generate_random_season(season_num=3, options=None):
                 b_count = random.choices([2, 3, 4], weights=[0.1, 0.45, 0.45])[0]
             elif density == 'varied':
                 b_count = random.choice([1, 2, 3, 4])
-            else: # progressive
-                if lvl <= 3:
-                    weights = [0.6, 0.4, 0.0, 0.0]
-                elif lvl <= 7:
-                    weights = [0.2, 0.6, 0.2, 0.0]
-                elif lvl <= 12:
-                    weights = [0.05, 0.45, 0.4, 0.1]
-                elif lvl <= 16:
-                    weights = [0.0, 0.2, 0.5, 0.3]
+            else: # progressive across 100 levels
+                if lvl <= 4:
+                    weights = [0.65, 0.35, 0.0, 0.0]
+                elif lvl <= 10:
+                    weights = [0.25, 0.60, 0.15, 0.0]
+                elif lvl <= 20:
+                    weights = [0.05, 0.45, 0.40, 0.10]
+                elif lvl <= 35:
+                    weights = [0.0, 0.25, 0.50, 0.25]
+                elif lvl <= 60:
+                    weights = [0.0, 0.10, 0.50, 0.40]
                 else:
-                    weights = [0.0, 0.1, 0.45, 0.45]
+                    weights = [0.0, 0.05, 0.45, 0.50]
                 b_count = random.choices([1, 2, 3, 4], weights=weights)[0]
                 
-            picked_b = random.sample(avail_behemoths, min(b_count, len(avail_behemoths)))
-            
+            if is_boss_level:
+                if rnd == 5:
+                    b_count = max(b_count, 3)
+                else:
+                    b_count = max(b_count, 2)
+                    
+            # Pick behemoths for this round
+            picked_b = []
+            if is_boss_level and rnd == 5 and keystone_pool:
+                keystone_pick = random.choice(keystone_pool)
+                picked_b.append(keystone_pick)
+                
+            pool = theme_behemoths if (theme_behemoths and random.random() < 0.85) else avail_behemoths
+            needed = b_count - len(picked_b)
+            if needed > 0:
+                remaining_candidates = [b for b in pool if b not in picked_b]
+                if len(remaining_candidates) < needed:
+                    remaining_candidates = [b for b in avail_behemoths if b not in picked_b]
+                if len(remaining_candidates) < needed:
+                    remaining_candidates = avail_behemoths[:]
+                picked_b.extend(random.sample(remaining_candidates, min(needed, len(remaining_candidates))))
+                
+            # Determine modifiers
             picked_m = []
             if avail_modifiers and modifier_intensity != 'vanilla':
                 if modifier_intensity == 'chaos':
@@ -398,12 +532,21 @@ def generate_random_season(season_num=3, options=None):
                         m_count = random.choices([0, 1], weights=[0.65, 0.35])[0]
                     elif lvl <= 10:
                         m_count = random.choices([0, 1, 2], weights=[0.25, 0.55, 0.20])[0]
-                    elif lvl <= 15:
+                    elif lvl <= 20:
                         m_count = random.choices([1, 2, 3], weights=[0.30, 0.50, 0.20])[0]
-                    else:
+                    elif lvl <= 50:
                         m_count = random.choices([1, 2, 3], weights=[0.20, 0.50, 0.30])[0]
+                    else:
+                        m_count = random.choices([2, 3], weights=[0.55, 0.45])[0]
+                        
+                if is_boss_level and rnd == 5:
+                    m_count = max(m_count, 2)
+                    
                 if m_count > 0:
-                    picked_m = random.sample(avail_modifiers, min(m_count, len(avail_modifiers)))
+                    m_pool = theme_modifiers if (theme_modifiers and random.random() < 0.75) else avail_modifiers
+                    if len(m_pool) < m_count:
+                        m_pool = avail_modifiers
+                    picked_m = random.sample(m_pool, min(m_count, len(m_pool)))
                     
             rounds.append({
                 'round': rnd,
@@ -412,8 +555,32 @@ def generate_random_season(season_num=3, options=None):
                 'modifiers': picked_m
             })
             
+        # Determine Behemoth Level for this level (engine supported up to 100 via expanded table)
+        if b_lvl_mode == 'escalating':
+            b_lvl = min(100, 10 + (lvl - 1) // 5)
+        elif b_lvl_mode == 'fixed10':
+            b_lvl = 10
+        elif b_lvl_mode == 'fixed15':
+            b_lvl = 15
+        elif b_lvl_mode == 'fixed20':
+            b_lvl = 20
+        elif b_lvl_mode == 'fixed25':
+            b_lvl = 25
+        elif b_lvl_mode == 'fixed30':
+            b_lvl = 30
+        elif b_lvl_mode == 'fixed40':
+            b_lvl = 40
+        elif b_lvl_mode == 'fixed50':
+            b_lvl = 50
+        elif b_lvl_mode == 'custom':
+            b_lvl = custom_b_lvl
+        else: # progressive
+            max_p = 25 if level_count <= 20 else (30 if level_count <= 100 else 50)
+            b_lvl = min(100, int(10 + round(float(max_p - 10) * (lvl - 1) / max(1, level_count - 1))))
+
         level_cfg[str(lvl)] = {
             'timeLimit': timer_seconds,
+            'behemothLevel': b_lvl,
             'rounds': rounds
         }
         
@@ -421,8 +588,11 @@ def generate_random_season(season_num=3, options=None):
         'ok': True,
         'season': s_idx,
         'levelCount': level_count,
+        'theme': theme,
         'density': density,
         'modifierIntensity': modifier_intensity,
+        'bossMilestones': boss_milestones,
+        'behemothLevelProgression': b_lvl_mode,
         'levelConfig': level_cfg
     }
 
@@ -436,6 +606,7 @@ def patch_spec_file(spec_name, cfg, out_dir):
     u = bytearray(uasset_path.read_bytes())
     b = bytearray(uexp_path.read_bytes())
     orig_u_len = len(u)
+    orig_b_len = len(b)
     names = get_uasset_names(u)
     
     if 'GAUNTLET_S1_LEVEL' not in names:
@@ -463,11 +634,56 @@ def patch_spec_file(spec_name, cfg, out_dir):
         struct.pack_into('<i', m_template, 99, 0)
         struct.pack_into('<I', m_template, 206, none_idx)
         
+    target_levels = set(cfg.get('targetLevels', []))
+    all_levels = cfg.get('allDualBehemothLevels', True)
+    level_config = cfg.get('levelConfig', {})
+    desired_behemoth_count = int(cfg.get('behemothCount', 3))
+    time_limit = float(cfg.get('timeLimitSeconds', 0))
+    global_modifiers = cfg.get('modifiers', [])
+    
+    base_row_count = struct.unpack_from('<I', b, 67)[0]
+    
+    # Calculate maximum required level across targetLevels and levelConfig
+    max_req_lvl = 0
+    if target_levels:
+        max_req_lvl = max(max_req_lvl, max(int(x) for x in target_levels if str(x).isdigit()))
+    if level_config:
+        max_req_lvl = max(max_req_lvl, max(int(x) for x in level_config.keys() if str(x).isdigit()))
+        
+    # Dynamically expand table if more levels than base rows are requested
+    if max_req_lvl > base_row_count:
+        pos_last = -1
+        o_scan = 71
+        for r_idx in range(base_row_count):
+            if r_idx == base_row_count - 1:
+                pos_last = o_scan
+                break
+            _, o_scan = r_name(b, o_scan, names)
+            while o_scan < len(b):
+                tag, o_scan = parse_tag(b, o_scan, names)
+                if tag['name'] == 'None':
+                    break
+        if pos_last != -1:
+            row_template = bytearray(b[pos_last : len(b) - 4])
+            new_rows_bytes = bytearray()
+            for extra_lvl in range(base_row_count + 1, max_req_lvl + 1):
+                new_row = bytearray(row_template)
+                struct.pack_into('<II', new_row, 0, l_idx, extra_lvl + 1)
+                new_rows_bytes.extend(new_row)
+            b = bytearray(b[:len(b) - 4] + new_rows_bytes + b[-4:])
+            struct.pack_into('<I', b, 67, max_req_lvl)
+            
+    effective_total_rows = max(base_row_count, max_req_lvl)
     rows = []
-    for num in range(2, 35):
-        pos = b.find(struct.pack('<II', l_idx, num))
-        if pos != -1:
-            rows.append((num - 1, pos))
+    o = 71
+    for r_idx in range(effective_total_rows):
+        start_o = o
+        rows.append((r_idx + 1, start_o))
+        rname, o = r_name(b, o, names)
+        while o < len(b):
+            tag, o = parse_tag(b, o, names)
+            if tag['name'] == 'None':
+                break
             
     target_levels = set(cfg.get('targetLevels', []))
     all_levels = cfg.get('allDualBehemothLevels', True)
@@ -600,16 +816,32 @@ def patch_spec_file(spec_name, cfg, out_dir):
                             valid_b = [x for x in want_b if x in names]
                             valid_m = [x for x in want_m if x in names] if mod_ct_idx is not None else []
                             
+                            target_b_lvl = None
+                            if lvl_cfg and 'behemothLevel' in lvl_cfg:
+                                try:
+                                    target_b_lvl = max(1, min(100, int(lvl_cfg['behemothLevel'])))
+                                except Exception:
+                                    pass
+                            elif 'behemothLevel' in cfg:
+                                try:
+                                    target_b_lvl = max(1, min(100, int(cfg['behemothLevel'])))
+                                except Exception:
+                                    pass
+                            
                             new_items = []
                             for s_idx, bn in enumerate(valid_b):
                                 if s_idx < len(b_items):
                                     itm = bytearray(b_items[s_idx]['raw'])
                                     struct.pack_into('<I', itm, 66, names.index(bn))
+                                    if target_b_lvl is not None and target_b_lvl > 0:
+                                        struct.pack_into('<i', itm, 99, target_b_lvl)
                                     new_items.append(itm)
                                 else:
                                     itm = bytearray(b_items[0]['raw'] if b_items else b_template)
                                     struct.pack_into('<I', itm, 33, b_ct_idx)
                                     struct.pack_into('<I', itm, 66, names.index(bn))
+                                    if target_b_lvl is not None and target_b_lvl > 0:
+                                        struct.pack_into('<i', itm, 99, target_b_lvl)
                                     struct.pack_into('<I', itm, 206, none_idx)
                                     new_items.append(itm)
                                     
@@ -656,8 +888,7 @@ def patch_spec_file(spec_name, cfg, out_dir):
         r_inner = struct.unpack_from('<Q', b, op['r_inner_sz_off'])[0]
         struct.pack_into('<Q', b, op['r_inner_sz_off'], r_inner + d)
         
-        total_delta += d
-        
+    total_delta = len(b) - orig_b_len
     export_count, export_at = struct.unpack_from('<II', u, 57)
     size, offset = struct.unpack_from('<qq', u, export_at + 28)
     struct.pack_into('<q', u, export_at + 28, size + total_delta)
@@ -671,7 +902,107 @@ def patch_spec_file(spec_name, cfg, out_dir):
     out_b = out_dir / f'{spec_name}.uexp'
     out_u.write_bytes(u)
     out_b.write_bytes(b)
-    print(f"[{spec_name}] Patched! added={total_delta} bytes (uasset intact at {len(u)} bytes)")
+    print(f"[{spec_name}] Patched! added={total_delta} bytes (uasset intact at {len(u)} bytes, rows={effective_total_rows})")
+    return True
+
+def build_expanded_enemy_level_table(max_level=100, out_dir=None):
+    base_u = BASE_ASSETS_DIR / 'exploration_enemy_level_table.uasset'
+    base_b = BASE_ASSETS_DIR / 'exploration_enemy_level_table.uexp'
+    hashes_file = ROOT / 'tools' / 'digit_name_hashes.json'
+    if not hashes_file.exists():
+        hashes_file = ROOT / 'package' / 'tools' / 'digit_name_hashes.json'
+    
+    if not base_u.exists() or not base_b.exists() or not hashes_file.exists():
+        print("[exploration_enemy_level_table] Base assets or digit hashes missing, skipping table expansion.")
+        return False
+        
+    uasset_bytes = bytearray(base_u.read_bytes())
+    uexp_bytes = bytearray(base_b.read_bytes())
+    with open(hashes_file, 'r', encoding='utf-8') as f:
+        hashes = json.load(f)
+        
+    # Read existing names
+    curr = 193
+    name_to_idx = {}
+    names_list = []
+    base_name_count = struct.unpack_from('<i', uasset_bytes, 41)[0]
+    for i in range(base_name_count):
+        slen, = struct.unpack_from('<i', uasset_bytes, curr)
+        curr += 4
+        s = uasset_bytes[curr:curr+slen-1].decode('latin-1') if slen > 0 else ''
+        curr += slen + 4
+        name_to_idx[s] = i
+        names_list.append(s)
+        
+    import_off = struct.unpack_from('<i', uasset_bytes, 69)[0]
+    
+    new_name_entries = bytearray()
+    for lvl in range(26, max_level + 1):
+        s = str(lvl)
+        if s not in name_to_idx:
+            s_bytes = s.encode('latin-1') + b'\x00'
+            slen = len(s_bytes)
+            h1, h2 = hashes.get(s, [0, 0])
+            name_to_idx[s] = len(names_list)
+            names_list.append(s)
+            new_name_entries.extend(struct.pack('<i', slen) + s_bytes + struct.pack('<HH', h1, h2))
+            
+    name_delta = len(new_name_entries)
+    new_uasset = bytearray(uasset_bytes[:import_off] + new_name_entries + uasset_bytes[import_off:])
+    
+    total_new_uasset_size = len(new_uasset)
+    struct.pack_into('<i', new_uasset, 24, total_new_uasset_size)
+    struct.pack_into('<i', new_uasset, 41, len(names_list))
+    struct.pack_into('<i', new_uasset, 69, import_off + name_delta)
+    
+    exp_off = struct.unpack_from('<i', uasset_bytes, 61)[0]
+    new_exp_off = exp_off + name_delta
+    struct.pack_into('<i', new_uasset, 61, new_exp_off)
+    dep_off = struct.unpack_from('<i', uasset_bytes, 73)[0]
+    struct.pack_into('<i', new_uasset, 73, dep_off + name_delta)
+    struct.pack_into('<i', new_uasset, 117, len(names_list))
+
+    # Shift AssetRegistryDataOffset (offset 165)
+    asset_reg_off = struct.unpack_from('<i', uasset_bytes, 165)[0]
+    struct.pack_into('<i', new_uasset, 165, asset_reg_off + name_delta)
+
+    # Shift PreloadDependencyOffset (offset 189)
+    preload_off = struct.unpack_from('<i', uasset_bytes, 189)[0]
+    struct.pack_into('<i', new_uasset, 189, preload_off + name_delta)
+    
+    body = bytearray(uexp_bytes[:-4])
+    footer = uexp_bytes[-4:]
+    struct.pack_into('<i', body, 41, max_level + 1)
+    
+    r25 = bytearray(uexp_bytes[20794:20794+847])
+    for lvl in range(26, max_level + 1):
+        row = bytearray(r25)
+        s_idx = name_to_idx[str(lvl)]
+        struct.pack_into('<ii', row, 0, s_idx, 0)
+        # Scaled Rams reward
+        struct.pack_into('<i', row, 414, min(2000, 500 + (lvl - 25) * 10))
+        # Mastery XP reward
+        struct.pack_into('<i', row, 777, 100 + (lvl - 1) * 10)
+        # Recommended Power (+25 per level)
+        rec_pow = 65 + (lvl - 1) * 25
+        struct.pack_into('<i', row, 806, rec_pow)
+        struct.pack_into('<i', row, 835, rec_pow)
+        body.extend(row)
+        
+    new_uexp = bytearray(body + footer)
+
+    # BulkDataStartOffset (offset 169, int64): uasset size + uexp size - 4
+    struct.pack_into('<q', new_uasset, 169, total_new_uasset_size + len(new_uexp) - 4)
+
+    struct.pack_into('<q', new_uasset, new_exp_off + 28, len(new_uexp) - 4)
+    struct.pack_into('<q', new_uasset, new_exp_off + 36, total_new_uasset_size)
+    
+    if out_dir is not None:
+        out_p = Path(out_dir)
+        (out_p / 'exploration_enemy_level_table.uasset').write_bytes(new_uasset)
+        (out_p / 'exploration_enemy_level_table.uexp').write_bytes(new_uexp)
+        
+    print(f"[exploration_enemy_level_table] Expanded successfully up to level {max_level} ({len(names_list)} names, {max_level+1} rows, {len(new_uexp)} uexp bytes)")
     return True
 
 def generate_pak(custom_config=None):
@@ -696,6 +1027,12 @@ def generate_pak(custom_config=None):
                 shutil.copy2(BASE_ASSETS_DIR / f'{s_name}.uasset', tmp_out / f'{s_name}.uasset')
                 shutil.copy2(BASE_ASSETS_DIR / f'{s_name}.uexp', tmp_out / f'{s_name}.uexp')
                 
+        # Build expanded exploration_enemy_level_table (supports behemoth levels 0 to 100)
+        try:
+            build_expanded_enemy_level_table(max_level=100, out_dir=tmp_out)
+        except Exception as e:
+            print(f"[exploration_enemy_level_table] Build error: {e}")
+
         builder = repak.PakBuilder()
         OUT_PAK_FILE.parent.mkdir(parents=True, exist_ok=True)
         writer = builder.writer(OUT_PAK_FILE, version=repak.Version.V3, mount_point='../../../')
@@ -707,6 +1044,14 @@ def generate_pak(custom_config=None):
                 if fpath.exists():
                     rel_path = f'{target_base}/{s_name}{ext}'
                     writer.write_file(rel_path, fpath.read_bytes())
+
+        # Also write expanded exploration_enemy_level_table into pak
+        table_base = 'Archon/Content/Monsters/_shared/data_tables'
+        for ext in ['.uasset', '.uexp']:
+            fpath = tmp_out / f'exploration_enemy_level_table{ext}'
+            if fpath.exists():
+                rel_path = f'{table_base}/exploration_enemy_level_table{ext}'
+                writer.write_file(rel_path, fpath.read_bytes())
                     
         writer.write_index()
         print(f"Pak successfully compiled: {OUT_PAK_FILE} ({OUT_PAK_FILE.stat().st_size} bytes)")
@@ -750,8 +1095,16 @@ if __name__ == '__main__':
 
     custom_cfg = None
     if len(sys.argv) > 1:
-        try:
-            custom_cfg = json.loads(sys.argv[1])
-        except Exception:
-            pass
+        raw_arg = sys.argv[1].strip()
+        if raw_arg.startswith('@'):
+            try:
+                with open(raw_arg[1:], 'r', encoding='utf-8') as f:
+                    custom_cfg = json.load(f)
+            except Exception:
+                pass
+        else:
+            try:
+                custom_cfg = json.loads(raw_arg)
+            except Exception:
+                pass
     generate_pak(custom_cfg)

@@ -874,7 +874,7 @@ async function runModsTool(v, args, timeout = 30000) {
   if (!node || !fs.existsSync(node)) node = (await findNode() || {}).path;
   if (!node) return { ok: false, error: 'Node.js was not found. Run Set up first.' };
   return new Promise((resolve) => {
-    execFile(node, [path.join(v.dataDir, 'tools', 'ue4ss.cjs'), ...args], { cwd: v.dataDir, timeout, windowsHide: true }, (e, out) => {
+    execFile(node, [path.join(v.dataDir, 'tools', 'ue4ss.cjs'), ...args], { cwd: v.dataDir, timeout, windowsHide: true, maxBuffer: 10 * 1024 * 1024 }, (e, out) => {
       try { resolve(JSON.parse(String(out || '').trim())); }
       catch { resolve({ ok: false, error: e ? `Mods helper failed (${e.message.split('\n')[0]}).` : 'Mods helper failed.' }); }
     });
@@ -894,7 +894,23 @@ ipcMain.handle('mods:act', async (_e, id, action, a, b) => {
   if (action === 'gauntlet-level-get') return runModsTool(v, ['gauntlet-level-get', String(a || 3), String(b || 1)]);
   if (action === 'gauntlet-random-season') return runModsTool(v, ['gauntlet-random-season', String(a || 3), 'b64:' + Buffer.from(typeof b === 'string' ? b : JSON.stringify(b || {})).toString('base64')], 60000);
   if (action === 'gauntlet-unlock-all') return runModsTool(v, ['gauntlet-unlock-all']);
-  if (action === 'gauntlet-set') return runModsTool(v, ['gauntlet-set', 'b64:' + Buffer.from(typeof a === 'string' ? a : JSON.stringify(a)).toString('base64')], 60000);
+  if (action === 'gauntlet-set') {
+    const dataDir = path.join(v.dataDir, 'data');
+    fs.mkdirSync(dataDir, { recursive: true });
+    const cfgPath = path.join(dataDir, 'gauntlet.json');
+    let content = a;
+    if (typeof content !== 'string') {
+      content = JSON.stringify(content, null, 2);
+    } else {
+      let s = content.trim();
+      if (s.startsWith('b64:')) {
+        try { s = Buffer.from(s.slice(4), 'base64').toString('utf8'); } catch {}
+      }
+      content = s;
+    }
+    fs.writeFileSync(cfgPath, content, 'utf8');
+    return runModsTool(v, ['gauntlet-set', '@' + cfgPath], 120000);
+  }
   if (action === 'folder') {
     const r = await runModsTool(v, ['status']);
     if (r && r.ok && r.folder && fs.existsSync(r.folder)) { shell.openPath(r.folder); return { ok: true }; }

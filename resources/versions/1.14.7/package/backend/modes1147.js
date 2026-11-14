@@ -7,16 +7,27 @@ const DEFAULT_SEASON='gauntlet-season5', MAX_LEVEL=9999999;
 const SEASON_FILE=path.join(__dirname,'..','data','gauntlet_season.txt');
 const CFG_FILE=path.join(__dirname,'..','data','gauntlet.json');
 
-function isUnlockAll(season){
+function getUnlockTargetCount(season){
  try{
   if(fs.existsSync(CFG_FILE)){
    const c=JSON.parse(fs.readFileSync(CFG_FILE,'utf8'));
    if(c&&c.unlockAllLevels){
-    if(c.season==='all'||!c.season||('gauntlet-season'+c.season)===season)return true;
+    if(c.season==='all'||!c.season||('gauntlet-season'+c.season)===season){
+     let maxLvl=100;
+     if(c.levelConfig){
+      const keys=Object.keys(c.levelConfig).map(Number).filter(n=>!isNaN(n));
+      if(keys.length)maxLvl=Math.max(maxLvl,Math.max(...keys));
+     }
+     if(Array.isArray(c.targetLevels)&&c.targetLevels.length){
+      const nums=c.targetLevels.map(Number).filter(n=>!isNaN(n));
+      if(nums.length)maxLvl=Math.max(maxLvl,Math.max(...nums));
+     }
+     return maxLvl;
+    }
    }
   }
  }catch{}
- return false;
+ return 0;
 }
 
 function getSeason(){
@@ -66,7 +77,8 @@ function create(ctx){
  function account(req,id){const found=ctx.getPlayers().filter(p=>p.accountId===id);if(found.length!==1)fail(404,'Gauntlet account not found');const p=found[0],token=ctx.bearerOf(req);if(token&&ctx.sessions.has(token)&&ctx.playerFor(req)!==p)fail(403,'Gauntlet account does not match signed-in player');return p;}
  function saved(p,s){
   const season=s||getSeason();const m=p.mega1147?.gauntlet1147?.[season];
-  if(isUnlockAll(season)){const comp=[];for(let k=1;k<=100;k++)comp.push(k);return{completed:comp,highest:100};}
+  const unlockCount=getUnlockTargetCount(season);
+  if(unlockCount>0){const comp=[];for(let k=1;k<=unlockCount;k++)comp.push(k);return{completed:comp,highest:unlockCount};}
   return m||{completed:[],highest:0};
  }
  function checkSeason(s){if(s!==getSeason())fail(404,'Gauntlet season is not available in this offline setup');}

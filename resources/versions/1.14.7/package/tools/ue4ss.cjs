@@ -127,7 +127,7 @@ function getActiveSeasonNum() {
   return 5;
 }
 
-function unlockGauntletLevels(targetSeason) {
+function unlockGauntletLevels(targetSeason, maxLvl) {
   try {
     const stateFile = path.join(DATA, 'state.json');
     if (!fs.existsSync(stateFile)) return false;
@@ -157,11 +157,26 @@ function unlockGauntletLevels(targetSeason) {
       targets.push(Number(targetSeason));
     }
 
+    let targetCount = Math.max(100, Number(maxLvl) || 100);
+    try {
+      if (!maxLvl && fs.existsSync(GAUNTLET_CFG_FILE)) {
+        const c = JSON.parse(fs.readFileSync(GAUNTLET_CFG_FILE, 'utf8'));
+        if (c.levelConfig) {
+          const keys = Object.keys(c.levelConfig).map(Number).filter(n => !isNaN(n));
+          if (keys.length) targetCount = Math.max(targetCount, Math.max(...keys));
+        }
+        if (Array.isArray(c.targetLevels) && c.targetLevels.length) {
+          const nums = c.targetLevels.map(Number).filter(n => !isNaN(n));
+          if (nums.length) targetCount = Math.max(targetCount, Math.max(...nums));
+        }
+      }
+    } catch {}
+
     const comp = [];
-    for (let k = 1; k <= 100; k++) comp.push(k);
+    for (let k = 1; k <= targetCount; k++) comp.push(k);
 
     for (const n of targets) {
-      p.mega1147.gauntlet1147['gauntlet-season' + n] = { completed: comp.slice(), highest: 100 };
+      p.mega1147.gauntlet1147['gauntlet-season' + n] = { completed: comp.slice(), highest: targetCount };
     }
 
     const tmp = stateFile + '.tmp';
@@ -225,12 +240,23 @@ function gauntletSet(raw) {
   let cfg;
   try {
     let s = String(raw || '').trim();
-    if (s.startsWith('b64:')) s = Buffer.from(s.slice(4), 'base64').toString('utf8');
+    if (s.startsWith('@')) {
+      const f = s.slice(1);
+      if (fs.existsSync(f)) {
+        s = fs.readFileSync(f, 'utf8');
+      }
+    } else if (s.startsWith('b64:')) {
+      s = Buffer.from(s.slice(4), 'base64').toString('utf8');
+    }
     cfg = JSON.parse(s);
   } catch (e) {
     try {
-      const s = String(raw).replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
-      cfg = JSON.parse(s);
+      if (fs.existsSync(GAUNTLET_CFG_FILE)) {
+        cfg = JSON.parse(fs.readFileSync(GAUNTLET_CFG_FILE, 'utf8'));
+      } else {
+        const s = String(raw).replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
+        cfg = JSON.parse(s);
+      }
     } catch {
       fail('Invalid JSON configuration.');
     }
@@ -245,11 +271,20 @@ function gauntletSet(raw) {
     } catch {}
   }
   if (cfg.unlockAllLevels) {
-    unlockGauntletLevels(cfg.season);
+    let maxLvl = 100;
+    if (cfg.levelConfig) {
+      const keys = Object.keys(cfg.levelConfig).map(Number).filter(n => !isNaN(n));
+      if (keys.length) maxLvl = Math.max(maxLvl, Math.max(...keys));
+    }
+    if (Array.isArray(cfg.targetLevels) && cfg.targetLevels.length) {
+      const nums = cfg.targetLevels.map(Number).filter(n => !isNaN(n));
+      if (nums.length) maxLvl = Math.max(maxLvl, Math.max(...nums));
+    }
+    unlockGauntletLevels(cfg.season, maxLvl);
   }
   const patcher = path.join(ROOT, 'tools', 'gauntlet_patcher.py');
   try {
-    execFileSync('python', [patcher, JSON.stringify(cfg)], { windowsHide: true });
+    execFileSync('python', [patcher, '@' + GAUNTLET_CFG_FILE], { windowsHide: true });
   } catch (e) {
     fail('Could not generate custom pak: ' + (e.message || String(e)));
   }

@@ -807,13 +807,17 @@
 
       <div class="gauntlet-field" id="gcfg-spec-level-wrap" hidden>
         <label class="report-label" for="gcfg-level-num">Level Number</label>
-        <input id="gcfg-level-num" class="fr-input" type="number" min="1" max="30" value="5" style="width: 80px;">
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <button type="button" class="gauntlet-btn-tool" id="gcfg-prev-lvl-btn" title="Previous Level" style="padding: 4px 8px; font-size: 11px;">&lt;</button>
+          <input id="gcfg-level-num" class="fr-input" type="number" min="1" max="1000" value="5" style="width: 65px; text-align: center;">
+          <button type="button" class="gauntlet-btn-tool" id="gcfg-next-lvl-btn" title="Next Level" style="padding: 4px 8px; font-size: 11px;">&gt;</button>
+        </div>
       </div>
 
       <div class="gauntlet-top-unlock">
         <label class="gauntlet-unlock-chk">
           <input type="checkbox" id="gcfg-unlock-all" checked>
-          <span>Unlock All Levels (1-100)</span>
+          <span>Unlock All Levels (1-1000)</span>
         </label>
         <button type="button" class="ghost" id="gcfg-unlock-all-seasons-btn" style="font-size: 11px; padding: 2px 8px;">Unlock All 5 Seasons</button>
       </div>
@@ -894,15 +898,22 @@
           </div>
         </div>
 
-        <div class="gcfg-timer-inline">
-          <label class="report-label" for="gcfg-spec-timer" style="margin: 0;">Starting Match Timer:</label>
-          <select id="gcfg-spec-timer" class="fr-input" style="width: 140px;">
-            <option value="420">Default (07:00)</option>
-            <option value="180">Speedrun (03:00)</option>
-            <option value="300">Fast (05:00)</option>
-            <option value="600">Endurance (10:00)</option>
-            <option value="900">Marathon (15:00)</option>
-          </select>
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div class="gcfg-timer-inline">
+            <label class="report-label" for="gcfg-spec-timer" style="margin: 0;">Starting Match Timer:</label>
+            <select id="gcfg-spec-timer" class="fr-input" style="width: 135px;">
+              <option value="420">Default (07:00)</option>
+              <option value="180">Speedrun (03:00)</option>
+              <option value="300">Fast (05:00)</option>
+              <option value="600">Endurance (10:00)</option>
+              <option value="900">Marathon (15:00)</option>
+            </select>
+          </div>
+
+          <div class="gcfg-timer-inline">
+            <label class="report-label" for="gcfg-spec-behemoth-lvl" style="margin: 0; white-space: nowrap;">Behemoth Level:</label>
+            <input id="gcfg-spec-behemoth-lvl" class="fr-input" type="number" min="1" max="100" value="10" style="width: 62px; text-align: center;" title="Average Behemoth Level for this Gauntlet Level (1-100)">
+          </div>
         </div>
       </div>
 
@@ -985,32 +996,63 @@
 
           <div class="gauntlet-field">
             <label class="report-label" for="gcfg-rand-levels">Number of Levels</label>
-            <select id="gcfg-rand-levels" class="fr-input">
-              <option value="5">5 Levels (Quick Rush)</option>
-              <option value="10">10 Levels (Standard)</option>
-              <option value="15">15 Levels (Extended)</option>
-              <option value="20" selected>20 Levels (Full Season)</option>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <select id="gcfg-rand-levels" class="fr-input" style="flex: 1;">
+                <option value="5">5 Levels (Quick Rush)</option>
+                <option value="10">10 Levels (Standard)</option>
+                <option value="20" selected>20 Levels (Classic Season)</option>
+                <option value="50">50 Levels (Extended)</option>
+                <option value="100">100 Levels (Centurion)</option>
+                <option value="200">200 Levels (Double Century)</option>
+                <option value="500">500 Levels (Epic Marathon)</option>
+                <option value="1000">1000 Levels (Millennium / Max)</option>
+                <option value="custom">Custom...</option>
+              </select>
+              <input id="gcfg-rand-custom-levels" class="fr-input" type="number" min="1" max="1000" value="25" style="width: 72px; display: none; text-align: center;" title="Custom level count (1-1000)">
+            </div>
+          </div>
+
+          <div class="gauntlet-field">
+            <label class="report-label" for="gcfg-rand-theme">Season Theme</label>
+            <select id="gcfg-rand-theme" class="fr-input">
+              <option value="all" selected>All Elements (Varied Mix)</option>
+              <option value="frost">Frostfall (Frost Behemoths &amp; Chill)</option>
+              <option value="blaze">Inferno Surge (Blaze &amp; Combustion)</option>
+              <option value="shock">Storm Surge (Shock &amp; Electrify)</option>
+              <option value="terra">Terra Dominion (Terra &amp; Stonehide)</option>
+              <option value="umbral">Umbral Void (Umbral &amp; Entropy)</option>
+              <option value="radiant">Radiant Dawn (Radiant &amp; Speed)</option>
+              <option value="keystones">Keystone Legends (Boss Rush)</option>
             </select>
           </div>
 
           <div class="gauntlet-field">
             <label class="report-label" for="gcfg-rand-density">Behemoth Density Progression</label>
             <select id="gcfg-rand-density" class="fr-input">
-              <option value="progressive" selected>Progressive (Solo early to Duo to Trio to Brawl endgame)</option>
-              <option value="duo">Duo Focus (Dual behemoths on every round)</option>
-              <option value="trio">Trio Focus (3 behemoths per round)</option>
-              <option value="chaos">High Density Chaos (Trio and Brawl across all levels)</option>
-              <option value="varied">Varied Mix (Random mix of Solo, Duo, Trio, Brawl)</option>
+              <option value="progressive" selected>Progressive (Solo to Duo to Trio to Brawl)</option>
+              <option value="duo">Duo Focus (Dual Behemoths every round)</option>
+              <option value="trio">Trio Focus (3 Behemoths every round)</option>
+              <option value="chaos">High Density Chaos (Trio and Brawl)</option>
+              <option value="varied">Varied Mix (Random mix across all)</option>
             </select>
           </div>
 
           <div class="gauntlet-field">
             <label class="report-label" for="gcfg-rand-mod-intensity">Modifier Intensity</label>
             <select id="gcfg-rand-mod-intensity" class="fr-input">
-              <option value="progressive" selected>Progressive (Clean early to 1-2 mid to 2-3 endgame)</option>
-              <option value="chaos">Full Chaos (1-3 active modifiers on every round)</option>
+              <option value="progressive" selected>Progressive (Clean early to 2-3 endgame)</option>
+              <option value="chaos">Full Chaos (1-3 modifiers every round)</option>
               <option value="mild">Mild (0-1 modifier per round)</option>
               <option value="vanilla">Vanilla (No extra modifiers)</option>
+            </select>
+          </div>
+
+          <div class="gauntlet-field">
+            <label class="report-label" for="gcfg-rand-milestones">Milestone Boss Levels</label>
+            <select id="gcfg-rand-milestones" class="fr-input">
+              <option value="every5" selected>Every 5 Levels (Mini-Bosses &amp; Keystones)</option>
+              <option value="every10">Every 10 Levels (Epic Keystone Bosses)</option>
+              <option value="none">None (Standard Progressive Curve)</option>
             </select>
           </div>
 
@@ -1026,12 +1068,31 @@
           </div>
 
           <div class="gauntlet-field">
+            <label class="report-label" for="gcfg-rand-behemoth-lvl">Average Behemoth Level</label>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <select id="gcfg-rand-behemoth-lvl" class="fr-input" style="flex: 1;">
+                <option value="progressive" selected>Progressive Scaling (10 early to 25-30+)</option>
+                <option value="escalating">Escalating (+1 every 5 levels)</option>
+                <option value="fixed10">Fixed Level 10 (Standard)</option>
+                <option value="fixed15">Fixed Level 15 (Challenger)</option>
+                <option value="fixed20">Fixed Level 20 (Heroic)</option>
+                <option value="fixed25">Fixed Level 25 (Endgame)</option>
+                <option value="fixed30">Fixed Level 30 (Nightmare)</option>
+                <option value="fixed40">Fixed Level 40 (Torment)</option>
+                <option value="fixed50">Fixed Level 50 (Mythic)</option>
+                <option value="custom">Custom...</option>
+              </select>
+              <input id="gcfg-rand-custom-b-lvl" class="fr-input" type="number" min="1" max="100" value="10" style="width: 62px; display: none; text-align: center;" title="Custom Behemoth Level (1-100)">
+            </div>
+          </div>
+
+          <div class="gauntlet-field" style="grid-column: span 2;">
             <label class="report-label" for="gcfg-rand-name">Custom Season Name</label>
             <input id="gcfg-rand-name" class="fr-input" type="text" placeholder="e.g. Shattered Isles Gauntlet S3" maxlength="60">
           </div>
         </div>
 
-        <p class="small" style="color: var(--ink-2); margin-top: 14px; line-height: 1.4;">
+        <p class="small" style="color: var(--ink-2); margin-top: 10px; line-height: 1.35;">
           Generates a full custom season configuration into the editor. You will be able to review, tweak any round or level, export the template to share, and apply it to your game.
         </p>
       </div>
@@ -1046,7 +1107,7 @@
 
   <!-- Export Custom Season Template Overlay -->
   <div class="gauntlet-overlay-panel" id="gcfg-export-panel" hidden>
-    <div class="gauntlet-overlay-card" style="max-width: 620px;">
+    <div class="gauntlet-overlay-card">
       <div class="gauntlet-overlay-header">
         <div>
           <h3>Share Custom Season Template</h3>
@@ -1078,7 +1139,7 @@
             <label class="report-label" for="gcfg-exp-preview" style="margin: 0;">Template JSON Preview</label>
             <span id="gcfg-exp-copy-feedback" class="small" style="color: var(--accent); display: none;">Copied to clipboard!</span>
           </div>
-          <textarea id="gcfg-exp-preview" class="fr-input" rows="8" readonly style="font-family: monospace; font-size: 11px; resize: none; background: #0b0f15; color: #b8c7db; white-space: pre;"></textarea>
+          <textarea id="gcfg-exp-preview" class="fr-input" rows="6" readonly style="font-family: monospace; font-size: 11px; resize: none; background: #0b0f15; color: #b8c7db; white-space: pre;"></textarea>
         </div>
       </div>
 
